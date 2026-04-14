@@ -1,0 +1,4449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workstream</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236c5ce7'/%3E%3Ctext x='16' y='23' text-anchor='middle' font-family='Inter,sans-serif' font-weight='700' font-size='20' fill='white'%3EW%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('workstream-theme') || 'dark');</script>
+<style>
+:root, [data-theme="dark"] {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface-hover: #1a1a26;
+  --border: #1e1e2e;
+  --border-subtle: #16161f;
+  --text: #e0e0e8;
+  --text-muted: #6b6b80;
+  --text-dim: #44445a;
+  --accent: #6c5ce7;
+  --accent-glow: rgba(108, 92, 231, 0.15);
+  --green: #2ed573;
+  --red: #ff4757;
+  --orange: #ffa502;
+  --blue: #5b7fff;
+  --cyan: #1dd1a1;
+  --yellow: #e5c07b;
+  --pink: #fd79a8;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-hover: #f0f1f5;
+  --border: #dfe1e8;
+  --border-subtle: #e8eaef;
+  --text: #1a1a2e;
+  --text-muted: #6b7280;
+  --text-dim: #9ca3af;
+  --accent: #5b4cdb;
+  --accent-glow: rgba(91, 76, 219, 0.1);
+  --green: #22a55b;
+  --red: #e5383b;
+  --orange: #e67e22;
+  --blue: #3b68e0;
+  --cyan: #0d9488;
+  --yellow: #b58d1c;
+  --pink: #db2777;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  transition: background 0.3s, color 0.3s;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 28px 24px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  transition: border-color 0.3s;
+  object-fit: cover;
+}
+
+.user-avatar:hover { border-color: var(--accent); }
+
+.header-text h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.2;
+}
+
+.header-greeting {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.weather-chip::before {
+  content: '\00b7';
+  margin-right: 2px;
+  color: var(--text-dim);
+}
+
+header .actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.refresh-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover { background: var(--surface-hover); border-color: var(--accent); }
+.refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+.last-updated {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 14px;
+  text-align: center;
+  transition: border-color 0.2s, transform 0.1s;
+  cursor: pointer;
+}
+
+.stat-card:hover { border-color: var(--accent); }
+.stat-card:active { transform: scale(0.96); }
+.stat-card .value { font-size: 28px; font-weight: 700; font-family: var(--font-mono); line-height: 1.1; }
+.stat-card .label { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
+.stat-card.alert .value { color: var(--red); }
+.stat-card.success .value { color: var(--green); }
+.stat-card.info .value { color: var(--accent); }
+.stat-card.warn .value { color: var(--orange); }
+.stat-card.review .value { color: var(--cyan); }
+.stat-card.assigned .value { color: var(--blue); }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 3px;
+  border: 1px solid var(--border);
+  width: fit-content;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 8px 16px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--accent); color: #fff; }
+@keyframes tabPulse { 0%,100% { box-shadow: none; } 50% { box-shadow: 0 0 0 3px var(--accent-glow); } }
+.tab.pulse { animation: tabPulse 0.6s ease; }
+
+.tab .count {
+  display: inline-block;
+  background: rgba(255,255,255,0.15);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  margin-left: 5px;
+  font-family: var(--font-mono);
+}
+
+/* PR List */
+.panel { display: none; }
+.panel.active { display: block; }
+
+.pr-list { display: flex; flex-direction: column; gap: 6px; }
+
+.pr-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  transition: all 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pr-card:hover { border-color: var(--accent); background: var(--surface-hover); transform: translateY(-1px); }
+
+.platform-icon {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.platform-icon.github { background: #161b22; color: #f0f6fc; }
+.platform-icon.gitlab { background: #292035; color: #fc6d26; }
+
+.pr-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.pr-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--border);
+  transition: border-color 0.2s;
+}
+.pr-card:hover .pr-avatar { border-color: var(--accent); }
+.pr-avatar-platform {
+  position: absolute;
+  bottom: -2px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--bg);
+}
+.pr-avatar-platform.github { background: #161b22; color: #f0f6fc; }
+.pr-avatar-platform.gitlab { background: #292035; color: #fc6d26; }
+
+.pr-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.pr-info h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+
+.pr-info h3 .title-text {
+  word-break: break-word;
+}
+
+.pr-info h3 .jira-link {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.pr-info .meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-family: var(--font-mono);
+  flex-wrap: wrap;
+  line-height: 1.6;
+}
+
+.pr-info .meta span {
+  white-space: nowrap;
+}
+
+.pr-meta-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+  max-width: 260px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.badge.draft { background: rgba(255,165,2,0.15); color: var(--orange); }
+.badge.open { background: rgba(46,213,115,0.15); color: var(--green); }
+.badge.merged { background: rgba(108,92,231,0.15); color: var(--accent); }
+.badge.closed { background: rgba(255,71,87,0.15); color: var(--red); }
+
+.ci-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: middle;
+}
+
+.ci-dot.passing { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.ci-dot.failing { background: var(--red); box-shadow: 0 0 6px var(--red); }
+.ci-dot.running { background: var(--orange); box-shadow: 0 0 6px var(--orange); animation: pulse 1.5s infinite; }
+.ci-dot.unknown { background: var(--text-dim); }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.ci-wrap {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+.ci-wrap:hover .ci-popover { display: block; }
+
+.ci-popover {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 0;
+  min-width: 260px;
+  max-width: 360px;
+  max-height: 320px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+[data-theme="light"] .ci-popover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+[data-theme="light"] .stat-card,
+[data-theme="light"] .pr-card,
+[data-theme="light"] .jira-card,
+[data-theme="light"] .sprint-banner,
+[data-theme="light"] .agenda-widget,
+[data-theme="light"] .yearly-card,
+[data-theme="light"] .activity-item {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+[data-theme="light"] .pr-card:hover,
+[data-theme="light"] .jira-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.ci-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--border);
+}
+
+.ci-popover-header {
+  padding: 0 12px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.ci-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: background 0.15s;
+}
+.ci-check-row:hover { background: rgba(255,255,255,0.03); }
+
+.ci-check-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ci-check-dot.passing { background: var(--green); }
+.ci-check-dot.failing { background: var(--red); }
+.ci-check-dot.running { background: var(--orange); animation: pulse 1.5s infinite; }
+.ci-check-dot.skipped, .ci-check-dot.cancelled { background: var(--text-dim); }
+.ci-check-dot.unknown { background: var(--text-dim); }
+
+.ci-check-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.ci-check-name a {
+  color: inherit;
+  text-decoration: none;
+}
+.ci-check-name a:hover { color: var(--accent); text-decoration: underline; }
+
+.ci-check-status {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.ci-check-status.passing { color: var(--green); }
+.ci-check-status.failing { color: var(--red); }
+.ci-check-status.running { color: var(--orange); }
+.ci-check-status.skipped, .ci-check-status.cancelled { color: var(--text-dim); }
+
+.review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.review-badge.approved {
+  color: var(--green);
+  background: rgba(46, 213, 115, 0.1);
+  border: 1px solid rgba(46, 213, 115, 0.25);
+}
+
+.review-badge.changes_requested {
+  color: var(--orange);
+  background: rgba(255, 165, 2, 0.1);
+  border: 1px solid rgba(255, 165, 2, 0.25);
+}
+
+.review-badge .review-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.approved-by {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.jira-link {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--cyan);
+  text-decoration: none;
+  padding: 1px 5px;
+  border: 1px solid rgba(29,209,161,0.3);
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.jira-link:hover { background: rgba(29,209,161,0.1); }
+
+.diff-stats {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.diff-stats .add { color: var(--green); }
+.diff-stats .del { color: var(--red); }
+
+.repo-name {
+  color: var(--text-dim);
+}
+
+/* Activity Feed */
+.activity-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  transition: border-color 0.2s;
+}
+
+.activity-item:hover { border-color: var(--border); }
+
+.activity-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.activity-icon.comment { background: rgba(108,92,231,0.2); color: var(--accent); }
+.activity-icon.approval { background: rgba(46,213,115,0.2); color: var(--green); }
+.activity-icon.change_request { background: rgba(255,71,87,0.2); color: var(--red); }
+.activity-icon.ci_fail { background: rgba(255,71,87,0.2); color: var(--red); }
+.activity-icon.ci_pass { background: rgba(46,213,115,0.2); color: var(--green); }
+.activity-icon.merge { background: rgba(108,92,231,0.2); color: var(--accent); }
+
+.activity-content { flex: 1; min-width: 0; }
+.activity-content .title { font-size: 12px; font-weight: 500; margin-bottom: 2px; line-height: 1.4; }
+.activity-content .title a { color: var(--text); text-decoration: none; }
+.activity-content .title a:hover { color: var(--accent); }
+.activity-content .body { font-size: 11px; color: var(--text-muted); margin-top: 4px; max-height: 48px; overflow: hidden; line-height: 1.4; }
+.activity-content .time { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); margin-top: 4px; }
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state h3 { font-size: 15px; margin-bottom: 8px; color: var(--text); }
+.empty-state p { font-size: 12px; }
+
+/* Jira Tasks */
+.jira-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+  gap: 2px;
+  background: var(--surface);
+  border-radius: 7px;
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+
+.filter-group .filter-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 5px 8px;
+  font-family: var(--font-mono);
+  align-self: center;
+}
+
+.filter-btn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.filter-btn:hover { color: var(--text); }
+.filter-btn.active { background: var(--accent); color: #fff; }
+
+.status-section {
+  margin-bottom: 20px;
+}
+
+.status-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.status-section-header h4 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.status-section-header .section-count {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.status-section-header.new h4 { color: var(--blue); }
+.status-section-header.in_progress h4 { color: var(--orange); }
+.status-section-header.in_review h4 { color: var(--cyan); }
+.status-section-header.release_pending h4 { color: var(--yellow, #e5c07b); }
+.status-section-header.done h4 { color: var(--green); }
+
+.jira-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  transition: all 0.2s;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.jira-card:hover { border-color: var(--accent); background: var(--surface-hover); transform: translateY(-1px); }
+
+.jira-card-icon {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  background: #0052cc;
+  color: #fff;
+}
+
+.jira-card-icon.bug { background: #de350b; }
+.jira-card-icon.story { background: #36b37e; }
+.jira-card-icon.task { background: #0065ff; }
+.jira-card-icon.subtask { background: #0065ff; opacity: 0.7; }
+
+.jira-card-body { flex: 1; min-width: 0; }
+
+.jira-card-body h3 {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.jira-card-body .jira-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  line-height: 1.6;
+}
+
+.jira-card-body .jira-meta span { white-space: nowrap; }
+
+.jira-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 60px;
+}
+
+.priority-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.priority-badge.critical, .priority-badge.blocker { background: rgba(255,71,87,0.2); color: var(--red); }
+.priority-badge.major { background: rgba(255,165,2,0.2); color: var(--orange); }
+.priority-badge.minor, .priority-badge.trivial { background: rgba(108,92,231,0.15); color: var(--text-muted); }
+.priority-badge.medium, .priority-badge.normal { background: rgba(91,127,255,0.15); color: var(--blue); }
+
+.sprint-tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--cyan);
+  padding: 1px 5px;
+  border: 1px solid rgba(29,209,161,0.3);
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role-tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.role-tag.assignee { color: var(--blue); border: 1px solid rgba(91,127,255,0.3); }
+.role-tag.reporter { color: var(--pink); border: 1px solid rgba(253,121,168,0.3); }
+.role-tag.both { color: var(--accent); border: 1px solid rgba(108,92,231,0.3); }
+
+/* Sprint Banner */
+.sprint-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: none;
+}
+
+.sprint-banner.visible { display: block; }
+
+.sprint-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sprint-banner-header.clickable {
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.2s;
+}
+.sprint-banner-header.clickable:hover {
+  background: rgba(108,92,231,0.06);
+}
+.sprint-banner-header.clickable:active { opacity: 0.85; }
+
+.sprint-link-icon {
+  width: 13px;
+  height: 13px;
+  vertical-align: middle;
+  margin-left: 4px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.sprint-banner-header.clickable:hover .sprint-link-icon { opacity: 1; color: var(--accent); }
+
+.sprint-banner-left h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sprint-banner-left h3 .sprint-project-tag {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--cyan);
+  background: rgba(29,209,161,0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.sprint-banner-left .sprint-dates {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.sprint-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.sprint-days-left {
+  text-align: center;
+}
+
+.sprint-days-left .days-number {
+  font-size: 26px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.sprint-days-left .days-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 2px;
+}
+
+.sprint-days-left.urgent .days-number { color: var(--red); }
+.sprint-days-left.warning .days-number { color: var(--orange); }
+.sprint-days-left.healthy .days-number { color: var(--green); }
+
+.sprint-progress {
+  margin-bottom: 14px;
+}
+
+.sprint-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.sprint-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.sprint-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+.sprint-task-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sprint-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.1s;
+}
+.sprint-chip:hover { border-color: var(--accent); }
+.sprint-chip:active { transform: scale(0.95); }
+
+.sprint-chip .chip-count {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.sprint-chip .chip-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.sprint-chip.new .chip-count { color: var(--blue); }
+.sprint-chip.in-progress .chip-count { color: var(--orange); }
+.sprint-chip.in-review .chip-count { color: var(--cyan); }
+.sprint-chip.done .chip-count { color: var(--green); }
+.sprint-chip.total .chip-count { color: var(--text); }
+
+.sprint-goal {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.sprint-goal strong {
+  color: var(--text-dim);
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Yearly Completions Widget */
+.yearly-widget {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+.yearly-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.yearly-header .yh-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+.yearly-reveal-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.yearly-reveal-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.yearly-reveal-btn svg { width: 14px; height: 14px; }
+
+.yearly-card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.2s, transform 0.1s;
+  cursor: pointer;
+}
+.yearly-card:hover { border-color: var(--accent); }
+.yearly-card:active { transform: scale(0.97); }
+
+.yearly-card .yc-number {
+  font-size: 36px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1;
+  min-width: 60px;
+  transition: filter 0.3s;
+}
+.yearly-card .yc-number.blurred {
+  filter: blur(12px);
+  user-select: none;
+}
+
+.yearly-card .yc-detail {
+  flex: 1;
+}
+
+.yearly-card .yc-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
+}
+
+.yearly-card .yc-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.yearly-card.current .yc-number { color: var(--cyan); }
+.yearly-card.previous .yc-number { color: var(--text-muted); }
+
+.yearly-trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: filter 0.3s;
+}
+.yearly-trend.blurred { filter: blur(8px); user-select: none; }
+
+.yearly-trend.up { color: var(--green); }
+.yearly-trend.down { color: var(--red); }
+.yearly-trend.same { color: var(--text-muted); }
+
+.yearly-trend .trend-arrow {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@media (max-width: 900px) {
+  .stats { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .pr-card { flex-wrap: wrap; }
+  .pr-meta-right { flex-direction: row; gap: 8px; min-width: auto; }
+  .tabs { width: 100%; }
+}
+
+/* --- Agenda --- */
+.agenda-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.agenda-widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.agenda-widget.tomorrow { opacity: 0.85; }
+.agenda-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.agenda-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agenda-header .agenda-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+@media (max-width: 768px) {
+  .agenda-container { grid-template-columns: 1fr; }
+}
+.agenda-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.agenda-event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+.agenda-event:hover { background: var(--surface-hover); }
+.agenda-event.now {
+  background: rgba(108, 92, 231, 0.08);
+  border-left: 3px solid var(--accent);
+  padding-left: 7px;
+}
+.agenda-event.past { opacity: 0.45; }
+.agenda-time {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.agenda-event.now .agenda-time { color: var(--accent); }
+.agenda-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agenda-event.all-day .agenda-time {
+  color: var(--cyan);
+  font-size: 11px;
+}
+.agenda-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.agenda-attendees {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.agenda-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(45, 213, 115, 0.12);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.agenda-join:hover { background: rgba(45, 213, 115, 0.22); }
+.agenda-now-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--accent-glow);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.agenda-empty {
+  text-align: center;
+  padding: 18px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.theme-toggle {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, color 0.2s;
+  flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--accent); color: var(--text); }
+.theme-toggle svg { width: 16px; height: 16px; }
+
+.app-footer {
+  text-align: center;
+  padding: 32px 0 12px;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.3px;
+  font-family: var(--font-mono);
+}
+
+/* AI Review button on PR cards */
+.ai-review-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.ai-review-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}
+.ai-review-btn svg { width: 12px; height: 12px; }
+
+/* Review modal overlay */
+.review-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+.review-overlay.visible { display: flex; }
+[data-theme="light"] .review-overlay { background: rgba(0,0,0,0.35); }
+
+.review-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 780px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+[data-theme="light"] .review-modal {
+  box-shadow: 0 16px 48px rgba(0,0,0,0.15);
+}
+
+.review-modal-header {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.review-modal-header h2 {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-modal-header .rm-repo {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.review-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.review-modal-close:hover { color: var(--text); }
+
+.review-modal-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.review-modal-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* Provider picker */
+.rm-provider-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.rm-provider-bar label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rm-provider-select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.rm-provider-select:focus { border-color: var(--accent); outline: none; }
+
+.rm-generate-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.rm-generate-btn:hover { opacity: 0.85; }
+.rm-generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Review loading */
+.rm-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.rm-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Review result */
+.rm-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.rm-summary-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.rm-comment {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--blue);
+  position: relative;
+}
+.rm-comment.critical { border-left-color: var(--red); }
+.rm-comment.warning { border-left-color: var(--orange); }
+.rm-comment.suggestion { border-left-color: var(--blue); }
+
+.rm-comment-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.rm-severity {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.rm-severity.critical { background: rgba(255,71,87,0.15); color: var(--red); }
+.rm-severity.warning { background: rgba(255,165,2,0.15); color: var(--orange); }
+.rm-severity.suggestion { background: rgba(91,127,255,0.15); color: var(--blue); }
+
+.rm-file-loc {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.rm-comment-body {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.rm-comment-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.rm-comment-actions button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+.rm-comment-actions button:hover { border-color: var(--accent); color: var(--text); }
+.rm-comment-actions button.danger:hover { border-color: var(--red); color: var(--red); }
+
+.rm-edit-area {
+  width: 100%;
+  min-height: 60px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 8px;
+  margin-top: 6px;
+  resize: vertical;
+}
+.rm-edit-area:focus { border-color: var(--accent); outline: none; }
+
+/* Footer buttons */
+.rm-btn {
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  transition: all 0.2s;
+}
+.rm-btn:hover { border-color: var(--accent); }
+.rm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rm-btn.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.rm-btn.primary:hover { opacity: 0.85; }
+.rm-btn.primary:disabled { opacity: 0.4; }
+
+.rm-post-confirm {
+  font-size: 11px;
+  color: var(--orange);
+  font-family: var(--font-mono);
+}
+
+.rm-comments-label {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.rm-error {
+  background: rgba(255,71,87,0.1);
+  border: 1px solid rgba(255,71,87,0.3);
+  color: var(--red);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rm-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.rm-divider::before, .rm-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.rm-copy-prompt-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+}
+.rm-copy-prompt-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.rm-copy-prompt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.rm-copy-prompt-btn svg { width: 14px; height: 14px; }
+
+.rm-prompt-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  text-align: center;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+/* Focus Banner */
+.focus-banner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text);
+  flex-wrap: wrap;
+  line-height: 1.6;
+}
+.focus-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.focus-item .focus-num {
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.focus-item.urgent .focus-num { color: var(--red); }
+.focus-item.warn .focus-num { color: var(--orange); }
+.focus-item.info .focus-num { color: var(--accent); }
+.focus-item.ok .focus-num { color: var(--green); }
+.focus-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* PR Staleness */
+.stale-badge {
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.stale-badge.stale-warn { background: rgba(255,165,2,0.15); color: var(--orange); }
+.stale-badge.stale-old { background: rgba(255,71,87,0.15); color: var(--red); }
+
+/* Search Bar */
+.search-bar {
+  position: relative;
+  margin-bottom: 12px;
+}
+.search-bar input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 14px 9px 34px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  transition: border-color 0.2s;
+}
+.search-bar input:focus { border-color: var(--accent); outline: none; }
+.search-bar input::placeholder { color: var(--text-dim); }
+.search-bar .search-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-dim);
+}
+.search-bar .search-shortcut {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Weekly Digest */
+.digest-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.digest-label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.digest-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text);
+}
+.digest-stat .digest-num {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+/* Quick Notes */
+.notes-widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.notes-header h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.notes-header h3 svg { width: 14px; height: 14px; color: var(--accent); }
+.notes-add-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.notes-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.note-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.note-input-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+.note-input-row input:focus { border-color: var(--accent); outline: none; }
+.note-input-row input::placeholder { color: var(--text-dim); }
+.note-input-row select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.note-input-row button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.note-input-row button:hover { opacity: 0.85; }
+
+.note-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.note-item:last-child { border-bottom: none; }
+.note-item .note-text {
+  flex: 1;
+  color: var(--text);
+  line-height: 1.4;
+}
+.note-item .note-ttl {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.note-item .note-delete {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 3px;
+  line-height: 1;
+}
+.note-item .note-delete:hover { color: var(--red); }
+.note-item.expired .note-text { color: var(--text-dim); text-decoration: line-through; }
+.notes-empty {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* Live Clock */
+.live-clock {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+}
+.clock-sep {
+  opacity: 0.5;
+  margin: 0 1px;
+}
+.clock-sep.blink {
+  animation: clockBlink 1s step-end infinite;
+}
+.clock-s {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 18px;
+}
+@keyframes clockBlink {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0; }
+}
+
+/* Stretch Reminder Toast */
+.stretch-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 340px;
+  z-index: 2000;
+  transform: translateY(120%);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.stretch-toast.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+[data-theme="light"] .stretch-toast {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+.stretch-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.stretch-emoji {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.stretch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  flex: 1;
+}
+.stretch-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.stretch-close:hover { color: var(--text); }
+.stretch-pose {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.stretch-tip {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Review Intelligence */
+.intel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.intel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.intel-card h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.intel-big-num {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.intel-label {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.intel-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.intel-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.intel-bar-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 100px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.intel-bar-track {
+  flex: 1;
+  height: 18px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.intel-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+  min-width: 2px;
+}
+.intel-bar-fill.cat-bug { background: var(--red); }
+.intel-bar-fill.cat-error_handling { background: var(--orange); }
+.intel-bar-fill.cat-security { background: var(--pink); }
+.intel-bar-fill.cat-testing { background: var(--green); }
+.intel-bar-fill.cat-performance { background: var(--blue); }
+.intel-bar-fill.cat-concurrency { background: var(--cyan); }
+.intel-bar-fill.cat-api_design { background: var(--yellow); }
+.intel-bar-fill.cat-documentation { background: var(--text-muted); }
+.intel-bar-fill.cat-architecture { background: var(--accent); }
+.intel-bar-fill.cat-other { background: var(--text-dim); }
+.intel-bar-count {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  width: 36px;
+  flex-shrink: 0;
+}
+.intel-reviewer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.intel-reviewer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.intel-reviewer-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  width: 130px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.intel-reviewer-count {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  width: 50px;
+  flex-shrink: 0;
+}
+.intel-reviewer-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.intel-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--accent-glow);
+  color: var(--accent);
+  font-weight: 500;
+}
+.intel-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-dim);
+}
+.intel-empty h3 {
+  font-size: 16px;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: 8px;
+}
+.intel-empty p { font-size: 13px; line-height: 1.6; }
+.intel-empty code {
+  background: var(--surface-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.intel-pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.intel-pattern-item {
+  padding: 10px 12px;
+  background: var(--surface-hover);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+.intel-pattern-meta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.intel-pattern-cat {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+.intel-pattern-freq {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.intel-pattern-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Intelligence V2 styles */
+.intel-input-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.intel-input-bar input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+.intel-progress {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.intel-progress-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.intel-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+.intel-progress-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.intel-sidebar {
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.intel-sidebar h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.intel-repo-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 3px 4px 3px 0;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.intel-repo-chip:hover { border-color: var(--accent); }
+.intel-repo-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+.intel-repo-chip .chip-count { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-left: 4px; }
+.intel-insights-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-top: 16px;
+}
+.intel-insights-card h3 {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.intel-insights-card h3 img { width: 18px; height: 18px; }
+.intel-insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.intel-insights-list li {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-left: 12px;
+  position: relative;
+}
+.intel-insights-list li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+/* AI Readiness tab styles */
+.readiness-input-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.readiness-input-bar input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.readiness-input-bar input:focus { border-color: var(--accent); }
+.readiness-input-bar input::placeholder { color: var(--text-dim); }
+.readiness-scan-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+}
+.readiness-scan-btn:hover { opacity: 0.85; }
+.readiness-scan-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.readiness-result {
+  display: none;
+}
+.readiness-result.visible { display: block; }
+
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  font-size: 32px;
+  font-weight: 800;
+  font-family: var(--font-sans);
+  letter-spacing: -1px;
+  flex-shrink: 0;
+}
+.grade-badge.grade-A { background: rgba(45,213,115,0.15); color: var(--green); border: 2px solid var(--green); }
+.grade-badge.grade-B { background: rgba(91,127,255,0.15); color: var(--blue); border: 2px solid var(--blue); }
+.grade-badge.grade-C { background: rgba(255,165,2,0.15); color: var(--orange); border: 2px solid var(--orange); }
+.grade-badge.grade-D { background: rgba(255,71,87,0.15); color: var(--red); border: 2px solid var(--red); }
+.grade-badge.grade-F { background: rgba(255,71,87,0.25); color: var(--red); border: 2px solid var(--red); }
+
+.readiness-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.readiness-header-info { flex: 1; min-width: 0; }
+.readiness-header-info h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.readiness-header-info .rh-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.readiness-score-total {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.readiness-categories {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 700px) {
+  .readiness-categories { grid-template-columns: 1fr; }
+}
+.readiness-cat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.readiness-cat-card h4 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.readiness-cat-card h4 span {
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.readiness-bar-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.readiness-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.8s ease-out;
+  background: var(--accent);
+}
+.readiness-findings {
+  list-style: none;
+}
+.readiness-findings li {
+  font-size: 11px;
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+.readiness-findings li .check { color: var(--green); }
+.readiness-findings li .miss { color: var(--red); }
+
+.readiness-recs {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.readiness-recs h4 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.readiness-recs ul {
+  list-style: none;
+}
+.readiness-recs li {
+  font-size: 12px;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.rec-priority {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.rec-priority.high { background: rgba(255,71,87,0.15); color: var(--red); }
+.rec-priority.medium { background: rgba(255,165,2,0.15); color: var(--orange); }
+.rec-priority.low { background: rgba(91,127,255,0.15); color: var(--blue); }
+.rec-impact {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.readiness-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.readiness-actions button {
+  padding: 8px 18px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.readiness-actions button:hover { border-color: var(--accent); }
+.readiness-actions button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.readiness-actions button.primary:hover { opacity: 0.85; }
+.readiness-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.readiness-files-preview {
+  display: none;
+  margin-bottom: 20px;
+}
+.readiness-files-preview.visible { display: block; }
+.readiness-file-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+.readiness-file-tab {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+.readiness-file-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.readiness-file-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.readiness-file-content pre {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  margin: 0;
+}
+
+.readiness-history {
+  margin-top: 24px;
+}
+.readiness-history h4 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+}
+.readiness-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.readiness-history-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+}
+.readiness-history-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text);
+}
+.readiness-history-table tr:hover td {
+  background: var(--surface-hover);
+}
+.history-grade {
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.history-grade.grade-A { color: var(--green); }
+.history-grade.grade-B { color: var(--blue); }
+.history-grade.grade-C { color: var(--orange); }
+.history-grade.grade-D, .history-grade.grade-F { color: var(--red); }
+.history-rescan {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+.history-rescan:hover { border-color: var(--accent); color: var(--accent); }
+
+.readiness-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.readiness-spinner .rm-spinner {
+  width: 22px; height: 22px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.tool-compat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  border: 1px solid var(--border);
+}
+.tool-compat-chip.present { background: rgba(46,160,67,0.1); border-color: var(--green); color: var(--green); }
+.tool-compat-chip.missing { background: var(--surface-hover); color: var(--text-dim); }
+.rec-priority.critical { background: var(--red); color: #fff; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="header-left">
+      <img class="user-avatar" src="https://github.com/happybhati.png" alt="avatar">
+      <div class="header-text">
+        <h1>Workstream</h1>
+        <div class="header-greeting" id="greeting"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <div class="live-clock" id="liveClock"></div>
+      <span class="last-updated" id="lastUpdated">--</span>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"></svg>
+      </button>
+      <button class="refresh-btn" id="refreshBtn" onclick="refresh()">Refresh</button>
+    </div>
+  </header>
+
+  <div class="focus-banner" id="focusBanner" style="display:none"></div>
+
+  <div id="sprintHome"></div>
+  <div id="agendaWidget"></div>
+
+  <div class="notes-widget" id="notesWidget">
+    <div class="notes-header">
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Quick Notes</h3>
+      <button class="notes-add-btn" onclick="toggleNoteInput()">+ Add</button>
+    </div>
+    <div id="noteInputArea" style="display:none">
+      <div class="note-input-row">
+        <input type="text" id="noteText" placeholder="Type a quick note or reminder..." onkeydown="if(event.key==='Enter')addNote()">
+        <select id="noteTTL">
+          <option value="forever">Keep forever</option>
+          <option value="today" selected>Today only</option>
+          <option value="1h">1 hour</option>
+          <option value="4h">4 hours</option>
+          <option value="week">This week</option>
+        </select>
+        <button onclick="addNote()">Save</button>
+      </div>
+    </div>
+    <div id="notesList"></div>
+  </div>
+
+  <div id="yearlyWidget"></div>
+
+  <div id="digestBar" class="digest-bar" style="display:none"></div>
+
+  <div class="stats" id="stats">
+    <div class="stat-card info" onclick="switchTab('my-prs')"><div class="value" id="statOpen">-</div><div class="label">My Open PRs</div></div>
+    <div class="stat-card warn" onclick="switchTab('my-prs')"><div class="value" id="statDraft">-</div><div class="label">Drafts</div></div>
+    <div class="stat-card assigned" onclick="switchTab('assigned')"><div class="value" id="statAssigned">-</div><div class="label">Assigned</div></div>
+    <div class="stat-card review" onclick="switchTab('reviews')"><div class="value" id="statReviews">-</div><div class="label">Reviews</div></div>
+    <div class="stat-card alert" onclick="switchTab('my-prs')"><div class="value" id="statFailing">-</div><div class="label">CI Failing</div></div>
+    <div class="stat-card success" onclick="switchTab('my-prs')"><div class="value" id="statMerged">-</div><div class="label">Merged</div></div>
+    <div class="stat-card info" onclick="navigateToJira()"><div class="value" id="statJira">-</div><div class="label">Jira Tasks</div></div>
+  </div>
+
+  <div class="search-bar">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Search PRs, Jira tasks, repos..." oninput="applySearch(this.value)">
+    <span class="search-shortcut">/</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="my-prs" onclick="switchTab('my-prs')">My PRs <span class="count" id="countMyPrs">0</span></button>
+    <button class="tab" data-tab="assigned" onclick="switchTab('assigned')">Assigned to Me <span class="count" id="countAssigned">0</span></button>
+    <button class="tab" data-tab="reviews" onclick="switchTab('reviews')">Review Requests <span class="count" id="countReviews">0</span></button>
+    <button class="tab" data-tab="jira" onclick="switchTab('jira')">Jira Tasks <span class="count" id="countJira">0</span></button>
+    <button class="tab" data-tab="activity" onclick="switchTab('activity')">Activity <span class="count" id="countActivity">0</span></button>
+    <button class="tab" data-tab="intelligence" onclick="switchTab('intelligence');loadIntelligence()">Intelligence <span class="count" id="countIntel">&#9679;</span></button>
+    <button class="tab" data-tab="readiness" onclick="switchTab('readiness');loadReadinessHistory()">AI Readiness <span class="count" id="countReadiness">&#9679;</span></button>
+  </div>
+
+  <div class="panel active" id="panel-my-prs">
+    <div class="pr-list" id="myPrsList"></div>
+  </div>
+
+  <div class="panel" id="panel-assigned">
+    <div class="pr-list" id="assignedList"></div>
+  </div>
+
+  <div class="panel" id="panel-reviews">
+    <div class="pr-list" id="reviewsList"></div>
+  </div>
+
+  <div class="panel" id="panel-jira">
+    <div class="jira-filters">
+      <div class="filter-group">
+        <span class="filter-label">Role</span>
+        <button class="filter-btn active" data-filter="role" data-value="all" onclick="setJiraFilter('role', 'all')">All</button>
+        <button class="filter-btn" data-filter="role" data-value="assignee" onclick="setJiraFilter('role', 'assignee')">Assigned</button>
+        <button class="filter-btn" data-filter="role" data-value="reporter" onclick="setJiraFilter('role', 'reporter')">Created</button>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Sprint</span>
+        <button class="filter-btn active" data-filter="sprint" data-value="all" onclick="setJiraFilter('sprint', 'all')">All</button>
+        <button class="filter-btn" data-filter="sprint" data-value="active" onclick="setJiraFilter('sprint', 'active')">In Sprint</button>
+        <button class="filter-btn" data-filter="sprint" data-value="backlog" onclick="setJiraFilter('sprint', 'backlog')">Backlog</button>
+      </div>
+    </div>
+    <div id="jiraContent"></div>
+  </div>
+
+  <div class="panel" id="panel-activity">
+    <div class="pr-list" id="activityList"></div>
+  </div>
+
+  <div class="panel" id="panel-intelligence">
+    <div class="intel-input-bar">
+      <input type="text" id="intelRepoUrl" placeholder="Enter GitHub repo URL (e.g. https://github.com/org/repo)" onkeydown="if(event.key==='Enter')startIntelCollection()">
+      <button class="readiness-scan-btn" id="intelCollectBtn" onclick="startIntelCollection()">Analyze Repository</button>
+    </div>
+    <div class="intel-progress" id="intelProgress" style="display:none">
+      <div class="intel-progress-bar"><div class="intel-progress-fill" id="intelProgressFill"></div></div>
+      <div class="intel-progress-msg" id="intelProgressMsg">Starting...</div>
+    </div>
+    <div id="intelRepoResult" style="display:none"></div>
+    <div class="intel-sidebar" id="intelSidebar">
+      <h4>Analyzed Repositories</h4>
+      <div id="intelRepoList"><div style="color:var(--text-dim);font-size:12px;padding:8px">Loading...</div></div>
+    </div>
+    <div id="intelContent"></div>
+  </div>
+
+  <div class="panel" id="panel-readiness">
+    <div class="readiness-input-bar">
+      <input type="text" id="readinessRepoUrl" placeholder="Enter GitHub repo URL (e.g. https://github.com/org/repo)" onkeydown="if(event.key==='Enter')scanReadiness()">
+      <button class="readiness-scan-btn" id="readinessScanBtn" onclick="scanReadiness()">Scan Repository</button>
+    </div>
+    <div class="readiness-spinner" id="readinessSpinner" style="display:none">
+      <div class="rm-spinner"></div>
+      <span>Scanning repository...</span>
+    </div>
+    <div class="readiness-result" id="readinessResult"></div>
+    <div class="readiness-history" id="readinessHistory"></div>
+  </div>
+
+  <footer class="app-footer">Workstream &mdash; Open-source developer dashboard</footer>
+</div>
+
+<div class="review-overlay" id="reviewOverlay" onclick="if(event.target===this)closeReviewModal()">
+  <div class="review-modal">
+    <div class="review-modal-header">
+      <div style="flex:1;min-width:0">
+        <h2 id="rmTitle">Review PR</h2>
+        <div class="rm-repo" id="rmRepo"></div>
+      </div>
+      <button class="review-modal-close" onclick="closeReviewModal()">&times;</button>
+    </div>
+    <div class="review-modal-body" id="rmBody">
+      <button class="rm-copy-prompt-btn" id="rmCopyPromptBtn" onclick="copyReviewPrompt()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy Review Prompt
+      </button>
+      <div class="rm-prompt-hint">Paste into Cursor, ChatGPT, Claude, or any LLM to get a code review</div>
+      <div id="rmPromptStatus" style="text-align:center;font-size:11px;font-family:var(--font-mono);margin-top:6px;min-height:16px"></div>
+      <div id="rmAISection" style="display:none">
+        <div class="rm-divider">or generate here</div>
+        <div class="rm-provider-bar">
+          <label>Provider</label>
+          <select class="rm-provider-select" id="rmProviderSelect"></select>
+          <button class="rm-generate-btn" id="rmGenerateBtn" onclick="generateReview()">Generate Review</button>
+        </div>
+      </div>
+      <div id="rmContent"></div>
+    </div>
+    <div class="review-modal-footer" id="rmFooter">
+      <span id="rmPostStatus" style="flex:1;font-size:11px;font-family:var(--font-mono);color:var(--text-muted)"></span>
+      <button class="rm-btn" onclick="copyReview()">Copy All</button>
+      <button class="rm-btn primary" id="rmPostBtn" onclick="confirmPostReview()" disabled>Post to VCS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const sunIcon = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+const moonIcon = '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('workstream-theme', theme);
+  const icon = document.getElementById('themeIcon');
+  if (icon) icon.innerHTML = theme === 'dark' ? sunIcon : moonIcon;
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.title = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem('workstream-theme') || 'dark';
+  applyTheme(saved);
+})();
+
+function setGreeting() {
+  const h = new Date().getHours();
+  let g = 'Good evening';
+  if (h < 12) g = 'Good morning';
+  else if (h < 17) g = 'Good afternoon';
+  const el = document.getElementById('greeting');
+  const name = WORKSTREAM_CONFIG.display_name || '';
+  const nameStr = name ? `, ${name}` : '';
+  if (el) el.innerHTML = `<span>${g}${nameStr}</span><span class="weather-chip" id="weatherChip"></span>`;
+  loadWeather();
+}
+setGreeting();
+
+const WMO_ICONS = {
+  0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',48:'🌫',
+  51:'🌦',53:'🌧',55:'🌧',61:'🌧',63:'🌧',65:'🌧',
+  71:'🌨',73:'🌨',75:'🌨',80:'🌦',81:'🌧',82:'🌧',
+  95:'⛈',96:'⛈',99:'⛈',
+};
+const WMO_DESC = {
+  0:'Clear',1:'Mostly clear',2:'Partly cloudy',3:'Overcast',
+  45:'Fog',48:'Rime fog',51:'Light drizzle',53:'Drizzle',55:'Heavy drizzle',
+  61:'Light rain',63:'Rain',65:'Heavy rain',71:'Light snow',73:'Snow',75:'Heavy snow',
+  80:'Light showers',81:'Showers',82:'Heavy showers',95:'Thunderstorm',96:'Hail storm',99:'Heavy hail',
+};
+
+async function loadWeather() {
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) reject('no geolocation');
+      navigator.geolocation.getCurrentPosition(
+        p => resolve({lat: p.coords.latitude, lon: p.coords.longitude}),
+        () => resolve({lat: 12.97, lon: 77.59}),
+        {timeout: 3000}
+      );
+    });
+    const [data, geo] = await Promise.all([
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pos.lat}&longitude=${pos.lon}&current=temperature_2m,weather_code&temperature_unit=celsius`).then(r => r.json()),
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.lat}&lon=${pos.lon}&format=json&zoom=10`).then(r => r.json()).catch(() => null),
+    ]);
+    const cur = data.current;
+    const code = cur.weather_code;
+    const icon = WMO_ICONS[code] || '🌡';
+    const desc = WMO_DESC[code] || '';
+    const city = geo?.address?.city || geo?.address?.town || geo?.address?.village || geo?.address?.state_district || '';
+    const chip = document.getElementById('weatherChip');
+    if (chip) chip.innerHTML = `${icon} ${Math.round(cur.temperature_2m)}°C ${desc}${city ? ' · ' + city : ''}`;
+  } catch(e) { /* weather is best-effort */ }
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active', 'pulse'));
+  const targetTab = document.querySelector(`.tab[data-tab="${tab}"]`);
+  targetTab.classList.add('active', 'pulse');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  targetTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+}
+
+async function navigateToJira(role, sprint, scrollToCategory) {
+  const r = role || 'all';
+  const s = sprint || 'all';
+  jiraFilters.role = r;
+  jiraFilters.sprint = s;
+  document.querySelectorAll('.filter-btn[data-filter="role"]').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn[data-filter="sprint"]').forEach(b => b.classList.remove('active'));
+  const roleBtn = document.querySelector(`.filter-btn[data-filter="role"][data-value="${r}"]`);
+  const sprintBtn = document.querySelector(`.filter-btn[data-filter="sprint"][data-value="${s}"]`);
+  if (roleBtn) roleBtn.classList.add('active');
+  if (sprintBtn) sprintBtn.classList.add('active');
+  switchTab('jira');
+  await loadJiraTasks();
+  if (scrollToCategory) {
+    setTimeout(() => {
+      const section = document.querySelector(`.status-section-header.${scrollToCategory}`);
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const now = new Date();
+  const d = new Date(dateStr);
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  const days = Math.floor(diff / 86400);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
+function renderPR(pr) {
+  const platformClass = pr.platform;
+  const platformLabel = pr.platform === 'github' ? 'GH' : 'GL';
+  const stateClass = pr.is_draft ? 'draft' : pr.state;
+  const stateLabel = pr.is_draft ? 'DRAFT' : pr.state.toUpperCase();
+
+  let jiraHtml = '';
+  if (pr.jira_key) {
+    const jiraUrl = `${WORKSTREAM_CONFIG.jira_url}/browse/${pr.jira_key}`;
+    jiraHtml = `<a class="jira-link" href="${jiraUrl}" target="_blank" onclick="event.stopPropagation(); window.open('${jiraUrl}', '_blank')">${pr.jira_key}</a>`;
+  }
+
+  const ciLabel = pr.ci_status === 'unknown' ? '' : pr.ci_status;
+
+  let checks = [];
+  try { checks = pr.ci_checks ? JSON.parse(pr.ci_checks) : []; } catch(e) {}
+  let ciHtml = '';
+  if (ciLabel) {
+    if (checks.length) {
+      const passed = checks.filter(c => c.status === 'passing').length;
+      const total = checks.length;
+      const rows = checks.map(c => {
+        const nameContent = c.url
+          ? `<a href="${c.url}" target="_blank" onclick="event.stopPropagation()">${escHtml(c.name)}</a>`
+          : escHtml(c.name);
+        return `<div class="ci-check-row"><span class="ci-check-dot ${c.status}"></span><span class="ci-check-name">${nameContent}</span><span class="ci-check-status ${c.status}">${c.status}</span></div>`;
+      }).join('');
+      ciHtml = `<span class="ci-wrap" onclick="event.stopPropagation()"><span class="ci-dot ${pr.ci_status}"></span>${ciLabel}<div class="ci-popover"><div class="ci-popover-header">${passed}/${total} checks passed</div>${rows}</div></span>`;
+    } else {
+      ciHtml = `<span><span class="ci-dot ${pr.ci_status}"></span>${ciLabel}</span>`;
+    }
+  }
+
+  let reviewHtml = '';
+  if (pr.review_state === 'approved') {
+    const approvers = pr.approved_by ? pr.approved_by.split(',') : [];
+    const approverText = approvers.length ? approvers.map(a => `@${a}`).join(', ') : '';
+    reviewHtml = `<span class="review-badge approved"><span class="review-icon">\u2705</span>Approved</span>`;
+    if (approverText) reviewHtml += `<span class="approved-by">${escHtml(approverText)}</span>`;
+  } else if (pr.review_state === 'changes_requested') {
+    reviewHtml = `<span class="review-badge changes_requested"><span class="review-icon">\u{1F504}</span>Changes</span>`;
+  }
+
+  const avatarHtml = pr.author_avatar
+    ? `<div class="pr-avatar-wrap"><img class="pr-avatar" src="${pr.author_avatar}&s=72" alt="${escHtml(pr.author)}"><span class="pr-avatar-platform ${platformClass}">${platformLabel}</span></div>`
+    : `<div class="platform-icon ${platformClass}">${platformLabel}</div>`;
+
+  let staleHtml = '';
+  if (pr.state === 'open' || pr.state === 'draft') {
+    const ageMs = Date.now() - new Date(pr.created_at).getTime();
+    const ageDays = Math.floor(ageMs / 86400000);
+    if (ageDays >= 7) staleHtml = `<span class="stale-badge stale-old">${ageDays}d old</span>`;
+    else if (ageDays >= 3) staleHtml = `<span class="stale-badge stale-warn">${ageDays}d old</span>`;
+  }
+
+  return `
+    <div class="pr-card" onclick="window.open('${pr.url}', '_blank')">
+      ${avatarHtml}
+      <div class="pr-info">
+        <h3><span class="title-text">${escHtml(pr.title)}</span>${jiraHtml}</h3>
+        <div class="meta">
+          <span class="repo-name">${pr.repo_full_name}#${pr.number}</span>
+          <span>${pr.author}</span>
+          ${ciHtml}
+          <span class="diff-stats"><span class="add">+${pr.additions || 0}</span> <span class="del">-${pr.deletions || 0}</span></span>
+          ${pr.comments_count ? `<span>${pr.comments_count} comment${pr.comments_count !== 1 ? 's' : ''}</span>` : ''}
+        </div>
+      </div>
+      <div class="pr-meta-right">
+        ${reviewHtml}
+        ${staleHtml}
+        <button class="ai-review-btn" onclick="openReviewModal('${pr.id}', '${escHtml(pr.title).replace(/'/g,"\\'")}', '${pr.repo_full_name}#${pr.number}', event)" title="AI-powered code review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h1a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>Review</button>
+        <span class="badge ${stateClass}">${stateLabel}</span>
+        <span style="font-size:10px;color:var(--text-dim);font-family:var(--font-mono)">${timeAgo(pr.updated_at)}</span>
+      </div>
+    </div>`;
+}
+
+const ACTIVITY_ICONS = {
+  comment: '\u{1F4AC}', approval: '\u2705', change_request: '\u{1F6D1}',
+  ci_fail: '\u274C', ci_pass: '\u2705', merge: '\u{1F389}',
+};
+
+function renderActivity(a) {
+  const icon = ACTIVITY_ICONS[a.event_type] || '\u{1F4CC}';
+  const bodyHtml = a.body ? `<div class="body">${escHtml(a.body.substring(0, 200))}</div>` : '';
+
+  return `
+    <div class="activity-item">
+      <div class="activity-icon ${a.event_type}">${icon}</div>
+      <div class="activity-content">
+        <div class="title">
+          <strong>${escHtml(a.actor)}</strong> ${a.event_type.replace('_', ' ')} on
+          <a href="${a.pr_url}" target="_blank">${a.repo_full_name}#${a.number}</a>
+        </div>
+        ${bodyHtml}
+        <div class="time">${timeAgo(a.created_at)}</div>
+      </div>
+    </div>`;
+}
+
+function emptyState(title, message) {
+  return `<div class="empty-state"><h3>${title}</h3><p>${message}</p></div>`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// --- Agenda (Today + Tomorrow) ---
+function renderAgendaEvents(events, isToday) {
+  const now = new Date();
+  return events.map(e => {
+    const isAllDay = !!e.is_all_day;
+    let timeStr = 'All day';
+    let cls = '';
+    if (!isAllDay) {
+      const start = new Date(e.start_time);
+      const end_t = new Date(e.end_time);
+      const fmt = d => d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      timeStr = `${fmt(start)} – ${fmt(end_t)}`;
+      if (isToday && now >= start && now <= end_t) cls = 'now';
+      else if (isToday && now > end_t) cls = 'past';
+    } else {
+      cls = 'all-day';
+    }
+    const joinBtn = e.meet_link
+      ? `<a class="agenda-join" href="${e.meet_link}" target="_blank">&#9654; Join</a>`
+      : '';
+    const attendees = e.attendee_count > 1
+      ? `<span class="agenda-attendees">${e.attendee_count}p</span>`
+      : '';
+    const nowBadge = cls === 'now' ? '<span class="agenda-now-badge">NOW</span>' : '';
+    return `<div class="agenda-event ${cls}">
+      <span class="agenda-time">${timeStr}</span>
+      <span class="agenda-title">${e.summary}</span>
+      <div class="agenda-meta">${nowBadge}${attendees}${joinBtn}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAgendaPanel(events, title, extraClass, isToday) {
+  const meetingCount = events.filter(e => !e.is_all_day).length;
+  const body = events.length
+    ? `<div class="agenda-list">${renderAgendaEvents(events, isToday)}</div>`
+    : `<div class="agenda-empty">No meetings</div>`;
+  return `
+    <div class="agenda-widget ${extraClass}">
+      <div class="agenda-header">
+        <h3>&#128197; ${title}</h3>
+        <span class="agenda-count">${meetingCount} meeting${meetingCount !== 1 ? 's' : ''}</span>
+      </div>
+      ${body}
+    </div>`;
+}
+
+async function loadAgenda() {
+  try {
+    const [todayEvents, tomorrowEvents] = await Promise.all([
+      fetch('/api/calendar/today').then(r => r.json()),
+      fetch('/api/calendar/tomorrow').then(r => r.json()),
+    ]);
+    const container = document.getElementById('agendaWidget');
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowLabel = `Tomorrow (${tomorrow.toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'})})`;
+
+    container.innerHTML = `
+      <div class="agenda-container">
+        ${renderAgendaPanel(todayEvents, "Today", '', true)}
+        ${renderAgendaPanel(tomorrowEvents, tomorrowLabel, 'tomorrow', false)}
+      </div>`;
+    checkMeetingNotifications(todayEvents);
+  } catch (err) {
+    console.error('Failed to load agenda:', err);
+  }
+}
+
+let notifiedMeetings = new Set();
+function checkMeetingNotifications(events) {
+  if (notifPermission !== 'granted') return;
+  const now = new Date();
+  events.forEach(e => {
+    if (e.is_all_day) return;
+    const start = new Date(e.start_time);
+    const minsUntil = (start - now) / 60000;
+    if (minsUntil > 0 && minsUntil <= 5 && !notifiedMeetings.has(e.event_id)) {
+      notifiedMeetings.add(e.event_id);
+      new Notification('Meeting starting soon', {
+        body: `${e.summary} in ${Math.ceil(minsUntil)} min`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="%236c5ce7"/><text x="16" y="23" text-anchor="middle" font-size="20" fill="white" font-weight="700">W</text></svg>',
+      });
+    }
+  });
+}
+
+// --- Yearly Completions ---
+let yearlyRevealed = false;
+
+function toggleYearlyReveal(e) {
+  e.stopPropagation();
+  yearlyRevealed = !yearlyRevealed;
+  document.querySelectorAll('.yc-number, .yearly-trend').forEach(el => {
+    el.classList.toggle('blurred', !yearlyRevealed);
+  });
+  const btn = document.getElementById('yearlyRevealBtn');
+  if (btn) btn.innerHTML = yearlyRevealed
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span>Hide</span>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg><span>Reveal</span>`;
+}
+
+async function loadYearlyCompletions() {
+  try {
+    const rows = await fetch('/api/yearly-completions').then(r => r.json());
+    const container = document.getElementById('yearlyWidget');
+    if (!rows.length) { container.innerHTML = ''; return; }
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const thisYear = rows.find(r => r.year === curYear) || { year: curYear, completed: 0, same_period: 0 };
+    const lastYear = rows.find(r => r.year === curYear - 1) || { year: curYear - 1, completed: 0, same_period: 0 };
+
+    const samePeriodLast = lastYear.same_period || 0;
+    const fairDiff = thisYear.completed - samePeriodLast;
+    let trendClass = 'same', trendArrow = '&mdash;', trendText = 'same';
+    if (fairDiff > 0) { trendClass = 'up'; trendArrow = '&uarr;'; trendText = `+${fairDiff}`; }
+    else if (fairDiff < 0) { trendClass = 'down'; trendArrow = '&darr;'; trendText = `${fairDiff}`; }
+
+    const monthsPassed = now.getMonth() + 1;
+    const pace = Math.round((thisYear.completed / monthsPassed) * 12);
+
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const periodLabel = `Jan–${monthNames[now.getMonth()]} ${lastYear.year}`;
+
+    const jqlBase = 'assignee = currentUser() AND status IN ("Done","Closed","Resolved","Release Pending")';
+    const jiraBase = WORKSTREAM_CONFIG.jira_url + '/issues/?jql=';
+    const thisYearJql = encodeURIComponent(`${jqlBase} AND updated >= "${thisYear.year}-01-01" AND updated < "${thisYear.year + 1}-01-01"`);
+    const lastYearJql = encodeURIComponent(`${jqlBase} AND updated >= "${lastYear.year}-01-01" AND updated < "${lastYear.year + 1}-01-01"`);
+    const blurClass = yearlyRevealed ? '' : 'blurred';
+
+    const eyeHiddenSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`;
+    const eyeOpenSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+    container.innerHTML = `
+      <div>
+        <div class="yearly-header">
+          <span class="yh-title">Yearly Completions</span>
+          <button class="yearly-reveal-btn" id="yearlyRevealBtn" onclick="toggleYearlyReveal(event)">
+            ${yearlyRevealed ? eyeOpenSvg + '<span>Hide</span>' : eyeHiddenSvg + '<span>Reveal</span>'}
+          </button>
+        </div>
+        <div class="yearly-widget">
+          <div class="yearly-card current" onclick="window.open('${jiraBase}${thisYearJql}', '_blank')">
+            <div class="yc-number ${blurClass}">${thisYear.completed}</div>
+            <div class="yc-detail">
+              <div class="yc-label">${thisYear.year} Completed</div>
+              <div class="yc-sub">~${pace} projected by year end</div>
+            </div>
+            <div class="yearly-trend ${trendClass} ${blurClass}">
+              <span class="trend-arrow">${trendArrow}</span>
+              <span>${trendText} vs same period</span>
+            </div>
+          </div>
+          <div class="yearly-card previous" onclick="window.open('${jiraBase}${lastYearJql}', '_blank')">
+            <div class="yc-number ${blurClass}">${lastYear.completed}</div>
+            <div class="yc-detail">
+              <div class="yc-label">${lastYear.year} Completed</div>
+              <div class="yc-sub">${samePeriodLast} by ${periodLabel}</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } catch (err) {
+    console.error('Failed to load yearly completions:', err);
+  }
+}
+
+// --- Sprint Info ---
+function renderSprintBanner(sprint) {
+  const start = new Date(sprint.start_date);
+  const end = new Date(sprint.end_date);
+  const now = new Date();
+  const totalMs = end - start;
+  const elapsedMs = now - start;
+  const remainMs = Math.max(0, end - now);
+  const daysLeft = Math.ceil(remainMs / 86400000);
+  const pct = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
+
+  let urgencyClass = 'healthy';
+  if (daysLeft <= 2) urgencyClass = 'urgent';
+  else if (daysLeft <= 5) urgencyClass = 'warning';
+
+  let progressColor = 'var(--green)';
+  if (pct > 85) progressColor = 'var(--red)';
+  else if (pct > 65) progressColor = 'var(--orange)';
+
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const t = sprint.my_tasks || {};
+
+  let goalHtml = '';
+  if (sprint.goal) {
+    goalHtml = `<div class="sprint-goal"><strong>Goal: </strong>${escHtml(sprint.goal)}</div>`;
+  }
+
+  const projects = sprint.projects || [sprint.project];
+  const boards = sprint.boards || {};
+  const boardProjects = WORKSTREAM_CONFIG.jira_board_projects.length ? WORKSTREAM_CONFIG.jira_board_projects : projects;
+  const boardProject = boardProjects.find(p => boards[p]) || projects.find(p => boards[p]) || projects[0] || '';
+  const boardId = boards[boardProject] || sprint.board_id;
+  const boardUrl = boardId
+    ? `${WORKSTREAM_CONFIG.jira_url}/jira/software/c/projects/${boardProject}/boards/${boardId}`
+    : '';
+  const openBoard = boardUrl ? `window.open('${boardUrl}', '_blank')` : '';
+
+  return `
+    <div class="sprint-banner visible">
+      <div class="sprint-banner-header${boardUrl ? ' clickable' : ''}" onclick="${openBoard}" title="${boardUrl ? 'Open sprint board in Jira' : ''}">
+        <div class="sprint-banner-left">
+          <h3>
+            ${(sprint.projects || [sprint.project]).map(p => `<span class="sprint-project-tag">${p}</span>`).join('')}
+            ${escHtml(sprint.name)}
+            ${boardUrl ? '<svg class="sprint-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>' : ''}
+          </h3>
+          <div class="sprint-dates">${fmt(start)} &ndash; ${fmt(end)}</div>
+        </div>
+        <div class="sprint-banner-right">
+          <div class="sprint-days-left ${urgencyClass}">
+            <div class="days-number">${daysLeft}</div>
+            <div class="days-label">days left</div>
+          </div>
+        </div>
+      </div>
+      <div class="sprint-progress">
+        <div class="sprint-progress-bar">
+          <div class="sprint-progress-fill" style="width:${pct.toFixed(1)}%;background:${progressColor}"></div>
+        </div>
+        <div class="sprint-progress-labels">
+          <span>${fmt(start)}</span>
+          <span>${pct.toFixed(0)}% elapsed</span>
+          <span>${fmt(end)}</span>
+        </div>
+      </div>
+      <div class="sprint-task-chips">
+        <div class="sprint-chip total" onclick="navigateToJira('assignee','active')"><span class="chip-count">${t.total || 0}</span><span class="chip-label">My Tasks</span></div>
+        <div class="sprint-chip new" onclick="navigateToJira('assignee','active','new')"><span class="chip-count">${t.new || 0}</span><span class="chip-label">To Do</span></div>
+        <div class="sprint-chip in-progress" onclick="navigateToJira('assignee','active','in_progress')"><span class="chip-count">${t.in_progress || 0}</span><span class="chip-label">In Progress</span></div>
+        <div class="sprint-chip in-review" onclick="navigateToJira('assignee','active','in_review')"><span class="chip-count">${t.in_review || 0}</span><span class="chip-label">In Review</span></div>
+        <div class="sprint-chip done" onclick="navigateToJira('assignee','active','done')"><span class="chip-count">${t.done || 0}</span><span class="chip-label">Done</span></div>
+      </div>
+      ${goalHtml}
+    </div>`;
+}
+
+async function loadSprintInfo() {
+  try {
+    const sprints = await fetch('/api/sprint-info').then(r => r.json());
+    const boardProjects = WORKSTREAM_CONFIG.jira_board_projects.length ? WORKSTREAM_CONFIG.jira_board_projects : [];
+    const releaseSprint = sprints.find(s => {
+      const sp = s.projects || [s.project];
+      return boardProjects.length ? boardProjects.some(p => sp.includes(p)) : true;
+    }) || sprints[0];
+    const container = document.getElementById('sprintHome');
+    container.innerHTML = releaseSprint ? renderSprintBanner(releaseSprint) : '';
+  } catch (err) {
+    console.error('Failed to load sprint info:', err);
+  }
+}
+
+// --- Jira ---
+let jiraFilters = { role: 'all', sprint: 'all' };
+let jiraCache = [];
+
+function setJiraFilter(type, value) {
+  jiraFilters[type] = value;
+  document.querySelectorAll(`.filter-btn[data-filter="${type}"]`).forEach(b => b.classList.remove('active'));
+  document.querySelector(`.filter-btn[data-filter="${type}"][data-value="${value}"]`).classList.add('active');
+  loadJiraTasks();
+}
+
+function renderJiraCard(issue) {
+  const typeClass = (issue.issue_type || '').toLowerCase().replace(/[- ]/g, '');
+  const typeLabel = (issue.issue_type || 'Task').substring(0, 2).toUpperCase();
+  const priorityClass = (issue.priority || '').toLowerCase();
+
+  let sprintHtml = '';
+  if (issue.sprint_name) {
+    sprintHtml = `<span class="sprint-tag" title="${escHtml(issue.sprint_name)}">${escHtml(issue.sprint_name)}</span>`;
+  }
+
+  let roleHtml = '';
+  if (issue.role) {
+    const roleLabel = issue.role === 'both' ? 'owner+reporter' : issue.role;
+    roleHtml = `<span class="role-tag ${issue.role}">${roleLabel}</span>`;
+  }
+
+  return `
+    <div class="jira-card" onclick="window.open('${issue.url}', '_blank')">
+      <div class="jira-card-icon ${typeClass}">${typeLabel}</div>
+      <div class="jira-card-body">
+        <h3>${escHtml(issue.summary)}</h3>
+        <div class="jira-meta">
+          <span style="color:var(--cyan)">${issue.key}</span>
+          <span>${issue.project}</span>
+          ${issue.assignee ? `<span>@ ${escHtml(issue.assignee)}</span>` : ''}
+          <span>${timeAgo(issue.updated_at)}</span>
+        </div>
+      </div>
+      <div class="jira-card-right">
+        ${issue.priority ? `<span class="priority-badge ${priorityClass}">${escHtml(issue.priority)}</span>` : ''}
+        ${sprintHtml}
+        ${roleHtml}
+      </div>
+    </div>`;
+}
+
+function renderJiraStatusGroup(category, label, issues) {
+  if (!issues.length) return '';
+  return `
+    <div class="status-section">
+      <div class="status-section-header ${category}">
+        <h4>${label}</h4>
+        <span class="section-count">${issues.length}</span>
+      </div>
+      ${issues.map(renderJiraCard).join('')}
+    </div>`;
+}
+
+async function loadJiraTasks() {
+  try {
+    const params = new URLSearchParams(jiraFilters);
+    const res = await fetch(`/api/jira-tasks?${params}`).then(r => r.json());
+    jiraCache = res;
+
+    const grouped = { new: [], in_progress: [], in_review: [], release_pending: [], done: [] };
+    for (const issue of res) {
+      const cat = issue.status_category || 'new';
+      if (grouped[cat]) grouped[cat].push(issue);
+      else grouped.new.push(issue);
+    }
+
+    const container = document.getElementById('jiraContent');
+    const html =
+      renderJiraStatusGroup('in_progress', 'In Progress', grouped.in_progress) +
+      renderJiraStatusGroup('in_review', 'In Review', grouped.in_review) +
+      renderJiraStatusGroup('release_pending', 'Release Pending', grouped.release_pending) +
+      renderJiraStatusGroup('new', 'New / To Do', grouped.new) +
+      renderJiraStatusGroup('done', 'Done (last 7 days)', grouped.done);
+
+    container.innerHTML = html || emptyState('No Jira tasks', 'Tasks from your boards will appear here after polling.');
+    document.getElementById('countJira').textContent = res.length;
+  } catch (err) {
+    console.error('Failed to load Jira tasks:', err);
+  }
+}
+
+async function loadData() {
+  try {
+    const [statsRes, myPrsRes, assignedRes, reviewsRes, activityRes] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/my-prs').then(r => r.json()),
+      fetch('/api/assigned').then(r => r.json()),
+      fetch('/api/review-requests').then(r => r.json()),
+      fetch('/api/activity').then(r => r.json()),
+    ]);
+
+    document.getElementById('statOpen').textContent = statsRes.open_prs;
+    document.getElementById('statDraft').textContent = statsRes.draft_prs;
+    document.getElementById('statAssigned').textContent = statsRes.assigned_prs;
+    document.getElementById('statReviews').textContent = statsRes.pending_reviews;
+    document.getElementById('statFailing').textContent = statsRes.ci_failing;
+    document.getElementById('statMerged').textContent = statsRes.merged_prs;
+    document.getElementById('statJira').textContent = statsRes.jira_tasks || 0;
+
+    checkAndNotify(statsRes);
+
+    document.getElementById('countMyPrs').textContent = myPrsRes.length;
+    document.getElementById('countAssigned').textContent = assignedRes.length;
+    document.getElementById('countReviews').textContent = reviewsRes.length;
+    document.getElementById('countActivity').textContent = activityRes.length;
+
+    const myPrsList = document.getElementById('myPrsList');
+    myPrsList.innerHTML = myPrsRes.length
+      ? myPrsRes.map(renderPR).join('')
+      : emptyState('No open PRs', 'Your pull requests will appear here.');
+
+    const assignedList = document.getElementById('assignedList');
+    assignedList.innerHTML = assignedRes.length
+      ? assignedRes.map(renderPR).join('')
+      : emptyState('Nothing assigned', 'PRs assigned to you will appear here.');
+
+    const reviewsList = document.getElementById('reviewsList');
+    reviewsList.innerHTML = reviewsRes.length
+      ? reviewsRes.map(renderPR).join('')
+      : emptyState('No pending reviews', 'PRs requesting your review will appear here.');
+
+    const activityList = document.getElementById('activityList');
+    activityList.innerHTML = activityRes.length
+      ? activityRes.map(renderActivity).join('')
+      : emptyState('No activity yet', 'Review comments, approvals, and CI events will appear here.');
+
+    await Promise.all([loadJiraTasks(), loadSprintInfo(), loadYearlyCompletions(), loadAgenda()]);
+
+    updateFocusBanner(statsRes, reviewsRes);
+    loadWeeklyDigest();
+
+    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+}
+
+async function refresh() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('loading');
+  btn.textContent = 'Refreshing...';
+  try {
+    await fetch('/api/refresh', { method: 'POST' });
+    await loadData();
+  } catch (err) {
+    console.error('Refresh failed:', err);
+  } finally {
+    btn.classList.remove('loading');
+    btn.textContent = 'Refresh';
+  }
+}
+
+// --- AI Review ---
+let aiProviders = [];
+let currentReviewPrId = '';
+let currentReviewData = null;
+let postConfirmPending = false;
+
+async function loadAIProviders() {
+  try {
+    aiProviders = await fetch('/api/review/providers').then(r => r.json());
+  } catch(e) { aiProviders = []; }
+}
+
+function openReviewModal(prId, title, repo, e) {
+  if (e) e.stopPropagation();
+  currentReviewPrId = prId;
+  currentReviewData = null;
+  postConfirmPending = false;
+  document.getElementById('rmTitle').textContent = title;
+  document.getElementById('rmRepo').textContent = repo;
+  document.getElementById('rmCopyPromptBtn').disabled = false;
+  document.getElementById('rmCopyPromptBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Review Prompt';
+  document.getElementById('rmPromptStatus').textContent = '';
+
+  const aiSection = document.getElementById('rmAISection');
+  if (aiProviders.length) {
+    aiSection.style.display = '';
+    const sel = document.getElementById('rmProviderSelect');
+    sel.innerHTML = aiProviders.map(p =>
+      `<option value="${p.id}">${escHtml(p.name)} (${escHtml(p.model)})${p.local ? ' — local' : ''}</option>`
+    ).join('');
+    document.getElementById('rmGenerateBtn').disabled = false;
+  } else {
+    aiSection.style.display = 'none';
+  }
+
+  document.getElementById('rmContent').innerHTML = '';
+  document.getElementById('rmPostBtn').disabled = true;
+  document.getElementById('rmPostStatus').textContent = '';
+  document.getElementById('reviewOverlay').classList.add('visible');
+}
+
+function closeReviewModal() {
+  document.getElementById('reviewOverlay').classList.remove('visible');
+  currentReviewPrId = '';
+  currentReviewData = null;
+  postConfirmPending = false;
+}
+
+async function copyReviewPrompt() {
+  const btn = document.getElementById('rmCopyPromptBtn');
+  const status = document.getElementById('rmPromptStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Fetching diff...';
+  status.textContent = '';
+  try {
+    const resp = await fetch('/api/review/prompt', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pr_id: currentReviewPrId }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    await navigator.clipboard.writeText(data.prompt);
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+    status.innerHTML = '<span style="color:var(--green)">Prompt copied — paste into Cursor, ChatGPT, Claude, or any LLM</span>';
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Copy Review Prompt';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function generateReview() {
+  const provider = document.getElementById('rmProviderSelect').value;
+  const btn = document.getElementById('rmGenerateBtn');
+  const content = document.getElementById('rmContent');
+  btn.disabled = true;
+  btn.textContent = 'Reviewing...';
+  document.getElementById('rmPostBtn').disabled = true;
+  document.getElementById('rmPostStatus').textContent = '';
+  postConfirmPending = false;
+  content.innerHTML = '<div class="rm-loading"><div class="rm-spinner"></div><span>Fetching diff and generating review...</span></div>';
+
+  try {
+    const resp = await fetch('/api/review', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ pr_id: currentReviewPrId, provider }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    currentReviewData = data;
+    renderReviewResult(data);
+    document.getElementById('rmPostBtn').disabled = false;
+  } catch(err) {
+    content.innerHTML = `<div class="rm-error"><strong>Review failed:</strong> ${escHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate Review';
+  }
+}
+
+function renderReviewResult(data) {
+  const content = document.getElementById('rmContent');
+  let html = '';
+
+  html += `<div class="rm-summary"><div class="rm-summary-label">Summary</div>${escHtml(data.summary)}</div>`;
+
+  if (data.comments && data.comments.length) {
+    html += `<div class="rm-comments-label">${data.comments.length} Comment${data.comments.length !== 1 ? 's' : ''}</div>`;
+    data.comments.forEach((c, i) => {
+      const sev = c.severity || 'suggestion';
+      const fileLoc = c.file ? `${escHtml(c.file)}${c.line ? ':' + c.line : ''}` : '';
+      html += `
+        <div class="rm-comment ${sev}" id="rmComment${i}">
+          <div class="rm-comment-header">
+            <span class="rm-severity ${sev}">${sev}</span>
+            ${fileLoc ? `<span class="rm-file-loc">${fileLoc}</span>` : ''}
+          </div>
+          <div class="rm-comment-body" id="rmCommentBody${i}">${escHtml(c.body)}</div>
+          <div class="rm-comment-actions">
+            <button onclick="editComment(${i})">Edit</button>
+            <button class="danger" onclick="removeComment(${i})">Remove</button>
+          </div>
+        </div>`;
+    });
+  } else {
+    html += '<div class="rm-comments-label">No issues found</div>';
+  }
+  content.innerHTML = html;
+}
+
+function editComment(idx) {
+  const bodyEl = document.getElementById(`rmCommentBody${idx}`);
+  const comment = currentReviewData.comments[idx];
+  if (bodyEl.querySelector('.rm-edit-area')) {
+    const ta = bodyEl.querySelector('.rm-edit-area');
+    comment.body = ta.value;
+    bodyEl.innerHTML = escHtml(comment.body);
+    return;
+  }
+  bodyEl.innerHTML = `<textarea class="rm-edit-area" onfocus="this.style.height=this.scrollHeight+'px'">${escHtml(comment.body)}</textarea>`;
+  const ta = bodyEl.querySelector('.rm-edit-area');
+  ta.focus();
+  ta.addEventListener('blur', () => {
+    comment.body = ta.value;
+    bodyEl.innerHTML = escHtml(comment.body);
+  });
+}
+
+function removeComment(idx) {
+  currentReviewData.comments.splice(idx, 1);
+  renderReviewResult(currentReviewData);
+}
+
+function copyReview() {
+  if (!currentReviewData) return;
+  const lines = [`## AI Review Summary\n${currentReviewData.summary}\n`];
+  (currentReviewData.comments || []).forEach(c => {
+    const sev = (c.severity || 'suggestion').toUpperCase();
+    const loc = c.file ? `${c.file}${c.line ? ':' + c.line : ''}` : '';
+    lines.push(`**[${sev}]** ${loc}\n${c.body}\n`);
+  });
+  navigator.clipboard.writeText(lines.join('\n---\n')).then(() => {
+    document.getElementById('rmPostStatus').textContent = 'Copied to clipboard';
+    setTimeout(() => { document.getElementById('rmPostStatus').textContent = ''; }, 2000);
+  });
+}
+
+function confirmPostReview() {
+  if (!currentReviewData || !currentReviewData.comments.length) return;
+  if (!postConfirmPending) {
+    postConfirmPending = true;
+    document.getElementById('rmPostStatus').innerHTML = '<span class="rm-post-confirm">Click "Post to VCS" again to confirm posting</span>';
+    return;
+  }
+  doPostReview();
+}
+
+async function doPostReview() {
+  const btn = document.getElementById('rmPostBtn');
+  const status = document.getElementById('rmPostStatus');
+  btn.disabled = true;
+  btn.textContent = 'Posting...';
+  status.textContent = '';
+  postConfirmPending = false;
+  try {
+    const resp = await fetch('/api/review/post', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        pr_id: currentReviewPrId,
+        comments: currentReviewData.comments,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    status.innerHTML = '<span style="color:var(--green)">Review posted successfully</span>';
+    btn.textContent = 'Posted';
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--red)">Failed: ${escHtml(err.message)}</span>`;
+    btn.disabled = false;
+    btn.textContent = 'Post to VCS';
+  }
+}
+
+// --- Focus Banner ---
+function updateFocusBanner(stats, reviewPrs) {
+  const el = document.getElementById('focusBanner');
+  const items = [];
+
+  if (stats.pending_reviews > 0) {
+    items.push(`<span class="focus-item warn"><span class="focus-num">${stats.pending_reviews}</span> PR${stats.pending_reviews !== 1 ? 's' : ''} waiting for your review</span>`);
+  }
+  if (stats.ci_failing > 0) {
+    items.push(`<span class="focus-item urgent"><span class="focus-num">${stats.ci_failing}</span> CI failing</span>`);
+  }
+
+  const agendaEl = document.getElementById('agendaWidget');
+  if (agendaEl) {
+    const events = agendaEl.querySelectorAll('.agenda-event');
+    let nextMeeting = null;
+    const now = new Date();
+    events.forEach(ev => {
+      const timeText = ev.querySelector('.agenda-time')?.textContent || '';
+      const match = timeText.match(/(\d{1,2}):(\d{2})\s*[–-]\s*/);
+      if (match) {
+        const meetTime = new Date(now);
+        meetTime.setHours(parseInt(match[1]), parseInt(match[2]), 0, 0);
+        if (meetTime > now && !nextMeeting) nextMeeting = meetTime;
+      }
+    });
+    if (nextMeeting) {
+      const mins = Math.round((nextMeeting - now) / 60000);
+      if (mins <= 60) {
+        items.push(`<span class="focus-item info">Meeting in <span class="focus-num">${mins} min</span></span>`);
+      }
+    }
+  }
+
+  if (stats.assigned_prs > 0) {
+    items.push(`<span class="focus-item info"><span class="focus-num">${stats.assigned_prs}</span> assigned to you</span>`);
+  }
+
+  if (items.length === 0) {
+    items.push(`<span class="focus-item ok"><span class="focus-num">\u2713</span> All clear — no urgent items</span>`);
+  }
+
+  el.innerHTML = items.join('<span class="focus-sep"></span>');
+  el.style.display = '';
+}
+
+// --- Search / Filter ---
+function applySearch(query) {
+  const q = query.toLowerCase().trim();
+  const activePanel = document.querySelector('.panel.active');
+  if (!activePanel) return;
+
+  const cards = activePanel.querySelectorAll('.pr-card, .jira-card');
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = q === '' || text.includes(q) ? '' : 'none';
+  });
+}
+
+// --- Keyboard Shortcuts ---
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+    if (e.key === 'Escape') { e.target.blur(); e.preventDefault(); }
+    return;
+  }
+
+  const overlay = document.getElementById('reviewOverlay');
+  if (overlay && overlay.classList.contains('visible')) {
+    if (e.key === 'Escape') { closeReviewModal(); e.preventDefault(); }
+    return;
+  }
+
+  switch(e.key) {
+    case '1': switchTab('my-prs'); e.preventDefault(); break;
+    case '2': switchTab('assigned'); e.preventDefault(); break;
+    case '3': switchTab('reviews'); e.preventDefault(); break;
+    case '4': switchTab('jira'); e.preventDefault(); break;
+    case '5': switchTab('activity'); e.preventDefault(); break;
+    case '6': switchTab('intelligence'); loadIntelligence(); e.preventDefault(); break;
+    case '7': switchTab('readiness'); loadReadinessHistory(); e.preventDefault(); break;
+    case 'r':
+      if (!e.metaKey && !e.ctrlKey) { refresh(); e.preventDefault(); }
+      break;
+    case '/':
+      e.preventDefault();
+      document.getElementById('searchInput').focus();
+      break;
+  }
+});
+
+// --- Weekly Digest ---
+async function loadWeeklyDigest() {
+  try {
+    const [statsRes, myPrsRes, reviewsRes] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/my-prs?include_merged=true').then(r => r.json()).catch(() => []),
+      fetch('/api/review-requests').then(r => r.json()),
+    ]);
+
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+
+    const el = document.getElementById('digestBar');
+    el.innerHTML = `
+      <span class="digest-label">This week</span>
+      <span class="digest-stat"><span class="digest-num">${statsRes.merged_prs || 0}</span> PRs merged</span>
+      <span class="digest-stat"><span class="digest-num">${statsRes.pending_reviews || 0}</span> reviews pending</span>
+      <span class="digest-stat"><span class="digest-num">${statsRes.open_prs || 0}</span> PRs open</span>
+      <span class="digest-stat"><span class="digest-num">${statsRes.jira_tasks || 0}</span> Jira tasks</span>
+    `;
+    el.style.display = '';
+  } catch(e) { /* digest is best-effort */ }
+}
+
+// --- Desktop Notifications ---
+let prevNotifState = { reviews: 0, ci_failing: 0 };
+let notifPermission = 'default';
+
+async function initNotifications() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    notifPermission = 'granted';
+  } else if (Notification.permission !== 'denied') {
+    const result = await Notification.requestPermission();
+    notifPermission = result;
+  }
+}
+
+function checkAndNotify(statsRes) {
+  if (notifPermission !== 'granted') return;
+
+  if (statsRes.pending_reviews > prevNotifState.reviews && prevNotifState.reviews >= 0) {
+    const diff = statsRes.pending_reviews - prevNotifState.reviews;
+    if (prevNotifState.reviews > 0) {
+      new Notification('Workstream', {
+        body: `${diff} new review request${diff > 1 ? 's' : ''}`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="%236c5ce7"/><text x="16" y="23" text-anchor="middle" font-size="20" fill="white" font-weight="700">W</text></svg>',
+      });
+    }
+  }
+
+  if (statsRes.ci_failing > prevNotifState.ci_failing && prevNotifState.ci_failing >= 0) {
+    if (prevNotifState.ci_failing > 0) {
+      new Notification('Workstream', {
+        body: `CI failing on ${statsRes.ci_failing} PR${statsRes.ci_failing > 1 ? 's' : ''}`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="%23ff4757"/><text x="16" y="23" text-anchor="middle" font-size="20" fill="white" font-weight="700">!</text></svg>',
+      });
+    }
+  }
+
+  prevNotifState = {
+    reviews: statsRes.pending_reviews,
+    ci_failing: statsRes.ci_failing,
+  };
+}
+
+let WORKSTREAM_CONFIG = { jira_url: '', jira_board_projects: [] };
+
+async function loadConfig() {
+  try {
+    WORKSTREAM_CONFIG = await fetch('/api/config').then(r => r.json());
+  } catch (e) { console.warn('Config load failed, using defaults'); }
+}
+
+initNotifications();
+loadAIProviders();
+
+loadConfig().then(() => {
+  setGreeting();
+  loadData();
+  setInterval(loadData, 60000);
+});
+// --- Quick Notes ---
+function getStoredNotes() {
+  try { return JSON.parse(localStorage.getItem('workstream-notes') || '[]'); } catch(e) { return []; }
+}
+function saveNotes(notes) {
+  localStorage.setItem('workstream-notes', JSON.stringify(notes));
+}
+
+function toggleNoteInput() {
+  const area = document.getElementById('noteInputArea');
+  area.style.display = area.style.display === 'none' ? '' : 'none';
+  if (area.style.display !== 'none') document.getElementById('noteText').focus();
+}
+
+function addNote() {
+  const input = document.getElementById('noteText');
+  const text = input.value.trim();
+  if (!text) return;
+  const ttl = document.getElementById('noteTTL').value;
+  const now = Date.now();
+  let expiresAt = null;
+  if (ttl === '1h') expiresAt = now + 3600000;
+  else if (ttl === '4h') expiresAt = now + 14400000;
+  else if (ttl === 'today') {
+    const eod = new Date(); eod.setHours(23, 59, 59, 999);
+    expiresAt = eod.getTime();
+  } else if (ttl === 'week') {
+    const eow = new Date();
+    eow.setDate(eow.getDate() + (7 - eow.getDay()));
+    eow.setHours(23, 59, 59, 999);
+    expiresAt = eow.getTime();
+  }
+  const notes = getStoredNotes();
+  notes.unshift({ id: now, text, ttl, expiresAt, createdAt: now });
+  saveNotes(notes);
+  input.value = '';
+  document.getElementById('noteInputArea').style.display = 'none';
+  renderNotes();
+}
+
+function deleteNote(id) {
+  const notes = getStoredNotes().filter(n => n.id !== id);
+  saveNotes(notes);
+  renderNotes();
+}
+
+function renderNotes() {
+  const notes = getStoredNotes();
+  const now = Date.now();
+  const active = notes.filter(n => !n.expiresAt || n.expiresAt > now);
+  const expired = notes.filter(n => n.expiresAt && n.expiresAt <= now);
+
+  // Auto-clean expired notes older than 2 hours
+  const kept = notes.filter(n => !n.expiresAt || n.expiresAt > now - 7200000);
+  if (kept.length !== notes.length) saveNotes(kept);
+
+  const el = document.getElementById('notesList');
+  if (active.length === 0 && expired.length === 0) {
+    el.innerHTML = '<div class="notes-empty">No notes yet — click + Add to create one</div>';
+    return;
+  }
+
+  let html = '';
+  active.forEach(n => {
+    let ttlLabel = '';
+    if (n.ttl === 'forever') ttlLabel = '∞';
+    else if (n.expiresAt) {
+      const remaining = n.expiresAt - now;
+      if (remaining < 3600000) ttlLabel = Math.ceil(remaining / 60000) + 'm left';
+      else if (remaining < 86400000) ttlLabel = Math.ceil(remaining / 3600000) + 'h left';
+      else ttlLabel = Math.ceil(remaining / 86400000) + 'd left';
+    }
+    html += `<div class="note-item">
+      <span class="note-text">${escHtml(n.text)}</span>
+      <span class="note-ttl">${ttlLabel}</span>
+      <button class="note-delete" onclick="deleteNote(${n.id})" title="Delete">&times;</button>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+renderNotes();
+setInterval(renderNotes, 60000);
+
+// --- Live Clock ---
+function updateClock() {
+  const el = document.getElementById('liveClock');
+  if (!el) return;
+  const now = new Date();
+  const h = now.getHours().toString().padStart(2, '0');
+  const m = now.getMinutes().toString().padStart(2, '0');
+  const s = now.getSeconds().toString().padStart(2, '0');
+  el.innerHTML = `<span class="clock-h">${h}</span><span class="clock-sep">:</span><span class="clock-m">${m}</span><span class="clock-sep blink">:</span><span class="clock-s">${s}</span>`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// --- Stretch Reminder ---
+const STRETCH_POSES = [
+  { emoji: '🧘', name: 'Seated Cat-Cow', tip: 'Arch your back on inhale, round it on exhale. 5 breaths.' },
+  { emoji: '🙆', name: 'Overhead Stretch', tip: 'Interlace fingers, push palms to ceiling. Hold 15 seconds.' },
+  { emoji: '🤸', name: 'Seated Twist', tip: 'Cross right leg over left, twist torso right. Hold 20 seconds each side.' },
+  { emoji: '💆', name: 'Neck Rolls', tip: 'Slowly roll your head in a circle. 5 times each direction.' },
+  { emoji: '🦅', name: 'Eagle Arms', tip: 'Wrap right arm under left, press palms together. Hold 15 seconds.' },
+  { emoji: '🙏', name: 'Wrist Stretch', tip: 'Extend arm, pull fingers back gently. 10 seconds each hand.' },
+  { emoji: '🧍', name: 'Standing Forward Fold', tip: 'Stand up, bend forward, let arms hang. Hold 20 seconds.' },
+  { emoji: '🦵', name: 'Figure-4 Stretch', tip: 'Seated: ankle on opposite knee, lean forward. 15 seconds each side.' },
+  { emoji: '🫁', name: 'Deep Breathing', tip: 'Inhale 4 counts, hold 4, exhale 6. Repeat 5 times.' },
+  { emoji: '👀', name: '20-20-20 Eye Rule', tip: 'Look at something 20 feet away for 20 seconds.' },
+  { emoji: '🤷', name: 'Shoulder Shrugs', tip: 'Lift shoulders to ears, hold 3 seconds, release. 10 reps.' },
+  { emoji: '🦶', name: 'Calf Raises', tip: 'Stand up and rise on your toes. Hold 2 seconds. 15 reps.' },
+];
+
+const STRETCH_MESSAGES = [
+  "Hey coder, your spine called — it wants a break! 🦴",
+  "You've been crushing it! Now crush a stretch. 💪",
+  "Plot twist: your chair is not a permanent home. 🪑",
+  "Even the best engineers need maintenance. 🔧",
+  "sudo stand up && stretch --now 🐧",
+  "Your future self will thank you for this stretch. 🙌",
+  "Time to debug your posture! 🐛",
+  "git commit -m 'take a break' && git push 🚀",
+  "Keyboard break! Your fingers will survive. ⌨️",
+  "Standing up is a feature, not a bug. 🐞",
+];
+
+let stretchDismissed = false;
+
+function showStretchReminder() {
+  if (stretchDismissed) { stretchDismissed = false; return; }
+  const pose = STRETCH_POSES[Math.floor(Math.random() * STRETCH_POSES.length)];
+  const msg = STRETCH_MESSAGES[Math.floor(Math.random() * STRETCH_MESSAGES.length)];
+  const toast = document.getElementById('stretchToast');
+  toast.innerHTML = `
+    <div class="stretch-header">
+      <span class="stretch-emoji">${pose.emoji}</span>
+      <span class="stretch-title">${msg}</span>
+      <button class="stretch-close" onclick="dismissStretch()">&times;</button>
+    </div>
+    <div class="stretch-pose">${pose.name}</div>
+    <div class="stretch-tip">${pose.tip}</div>
+  `;
+  toast.classList.add('visible');
+  setTimeout(() => { toast.classList.remove('visible'); }, 30000);
+}
+
+function dismissStretch() {
+  document.getElementById('stretchToast').classList.remove('visible');
+  stretchDismissed = true;
+}
+
+setInterval(showStretchReminder, 3600000);
+setTimeout(showStretchReminder, 5000);
+
+// ---------------------------------------------------------------------------
+// Review Intelligence Tab
+// ---------------------------------------------------------------------------
+let intelLoaded = false;
+let intelTaskId = null;
+let intelPollTimer = null;
+
+async function loadIntelligence() {
+  await loadIntelRepoList();
+  if (intelLoaded) return;
+  const container = document.getElementById('intelContent');
+  container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-dim)">Loading intelligence data...</div>';
+
+  try {
+    const [statsRes, patternsRes, reviewersRes] = await Promise.all([
+      fetch('/api/intelligence/stats').then(r => r.json()),
+      fetch('/api/intelligence/patterns').then(r => r.json()),
+      fetch('/api/intelligence/reviewers').then(r => r.json()),
+    ]);
+    renderIntelligenceOverview(statsRes, patternsRes, reviewersRes);
+    intelLoaded = true;
+  } catch {
+    container.innerHTML = `<div class="intel-empty">
+      <h3>Review Intelligence</h3>
+      <p>Enter a GitHub repository URL above to start analyzing its review culture.</p>
+      <p style="margin-top:8px;font-size:12px;color:var(--text-dim)">Or use the CLI: <code>workstream collect &lt;repo-url&gt;</code></p>
+    </div>`;
+  }
+}
+
+async function loadIntelRepoList() {
+  try {
+    const repos = await fetch('/api/intelligence/repos').then(r => r.json());
+    const list = document.getElementById('intelRepoList');
+    if (!repos.length) {
+      list.innerHTML = '<div style="color:var(--text-dim);font-size:12px;padding:4px">No repositories analyzed yet.</div>';
+      return;
+    }
+    list.innerHTML = repos.map(r =>
+      `<span class="intel-repo-chip" onclick="loadIntelRepo('${r.repo}')">${r.repo.split('/')[1]}<span class="chip-count">${r.pr_count} PRs</span></span>`
+    ).join('');
+  } catch {
+    document.getElementById('intelRepoList').innerHTML = '';
+  }
+}
+
+async function startIntelCollection() {
+  const input = document.getElementById('intelRepoUrl');
+  const url = input.value.trim();
+  if (!url) { input.focus(); return; }
+
+  const btn = document.getElementById('intelCollectBtn');
+  const progress = document.getElementById('intelProgress');
+  btn.disabled = true;
+  progress.style.display = 'block';
+  document.getElementById('intelProgressFill').style.width = '0%';
+  document.getElementById('intelProgressMsg').textContent = 'Starting collection...';
+  document.getElementById('intelRepoResult').style.display = 'none';
+
+  try {
+    const resp = await fetch('/api/intelligence/collect', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({repo_url: url}),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    intelTaskId = data.task_id;
+    pollIntelProgress();
+  } catch (err) {
+    document.getElementById('intelProgressMsg').textContent = 'Error: ' + err.message;
+    btn.disabled = false;
+  }
+}
+
+function pollIntelProgress() {
+  if (!intelTaskId) return;
+  clearTimeout(intelPollTimer);
+
+  fetch(`/api/intelligence/progress/${intelTaskId}`).then(r => r.json()).then(task => {
+    const fill = document.getElementById('intelProgressFill');
+    const msg = document.getElementById('intelProgressMsg');
+    fill.style.width = (task.percent || 0) + '%';
+    msg.textContent = task.message || task.stage || '';
+
+    if (task.done) {
+      document.getElementById('intelCollectBtn').disabled = false;
+      if (task.error) {
+        msg.textContent = 'Error: ' + task.error;
+      } else {
+        msg.textContent = 'Complete! Loading results...';
+        loadIntelRepo(task.repo);
+        loadIntelRepoList();
+        intelLoaded = false;
+        loadIntelligence();
+      }
+      intelTaskId = null;
+    } else {
+      intelPollTimer = setTimeout(pollIntelProgress, 2000);
+    }
+  }).catch(() => {
+    intelPollTimer = setTimeout(pollIntelProgress, 3000);
+  });
+}
+
+async function loadIntelRepo(repoSlug) {
+  const resultDiv = document.getElementById('intelRepoResult');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-dim)">Loading...</div>';
+
+  document.querySelectorAll('.intel-repo-chip').forEach(c => {
+    c.classList.toggle('active', c.textContent.includes(repoSlug.split('/')[1]));
+  });
+
+  try {
+    const data = await fetch(`/api/intelligence/repo/${repoSlug}`).then(r => r.json());
+    renderIntelRepoResult(data);
+  } catch (err) {
+    resultDiv.innerHTML = `<div style="padding:16px;color:var(--red);font-size:13px">Failed to load: ${err.message}</div>`;
+  }
+}
+
+function renderIntelRepoResult(data) {
+  const resultDiv = document.getElementById('intelRepoResult');
+  const cats = data.categories || {};
+  const maxCat = Math.max(...Object.values(cats), 1);
+  const reviewers = data.reviewers || [];
+  const patterns = data.patterns || [];
+  const insights = data.insights || {};
+  const range = data.date_range || {};
+
+  let html = `
+    <div class="intel-grid" style="margin-bottom:16px">
+      <div class="intel-card">
+        <h3>${escapeHtml(data.repo)}</h3>
+        <div class="intel-big-num">${data.pr_count || 0}</div>
+        <div class="intel-label">PRs analyzed &middot; ${data.comment_count || 0} comments</div>
+        ${range.earliest ? `<div style="margin-top:6px;font-size:10px;color:var(--text-dim)">${new Date(range.earliest).toLocaleDateString()} — ${new Date(range.latest).toLocaleDateString()}</div>` : ''}
+      </div>
+    </div>`;
+
+  if (Object.keys(cats).length > 0) {
+    html += `<div class="intel-card" style="margin-bottom:16px">
+        <h3>Review Culture</h3>
+        <div class="intel-bar-chart">
+          ${Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,cnt]) => `
+            <div class="intel-bar-row">
+              <div class="intel-bar-label">${cat.replace('_',' ')}</div>
+              <div class="intel-bar-track">
+                <div class="intel-bar-fill cat-${cat}" style="width:${(cnt/maxCat*100).toFixed(1)}%"></div>
+              </div>
+              <div class="intel-bar-count">${cnt}</div>
+            </div>
+          `).join('')}
+        </div>
+    </div>`;
+  }
+
+  if (patterns.length) {
+    html += `<div class="intel-card" style="margin-bottom:16px">
+      <h3>Review Patterns</h3>
+      <div class="intel-pattern-list">
+        ${patterns.slice(0,10).map(p => `
+          <div class="intel-pattern-item">
+            <div class="intel-pattern-meta">
+              <span class="intel-pattern-cat">${p.category}</span>
+              <span class="intel-pattern-freq">${p.frequency}x</span>
+            </div>
+            <div class="intel-pattern-text">${escapeHtml(p.pattern)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (insights.claude_md_rules || insights.cursor_rules || insights.copilot_review) {
+    html += `<div class="intel-grid" style="grid-template-columns:repeat(auto-fill, minmax(300px, 1fr))">`;
+    if (insights.claude_md_rules?.length) {
+      html += `<div class="intel-insights-card">
+        <h3>CLAUDE.md Guidance</h3>
+        <ul class="intel-insights-list">${insights.claude_md_rules.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>`;
+    }
+    if (insights.cursor_rules?.length) {
+      html += `<div class="intel-insights-card">
+        <h3>.cursor/rules Guidance</h3>
+        <ul class="intel-insights-list">${insights.cursor_rules.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>`;
+    }
+    if (insights.copilot_review?.length) {
+      html += `<div class="intel-insights-card">
+        <h3>Copilot Review Guidance</h3>
+        <ul class="intel-insights-list">${insights.copilot_review.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>`;
+    }
+    if (insights.agents_md_conventions?.length) {
+      html += `<div class="intel-insights-card">
+        <h3>AGENTS.md Conventions</h3>
+        <ul class="intel-insights-list">${insights.agents_md_conventions.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  resultDiv.innerHTML = html;
+}
+
+function renderIntelligenceOverview(stats, patterns, reviewers) {
+  const container = document.getElementById('intelContent');
+  const prTotal = stats.prs_collected?._total || 0;
+  const commentTotal = stats.comments?.total || 0;
+  const patternCount = stats.pattern_count || 0;
+  const reviewerCount = stats.reviewer_count || 0;
+
+  if (prTotal === 0) {
+    container.innerHTML = `<div class="intel-empty">
+      <h3>No Data Yet</h3>
+      <p>Enter a repository URL above and click "Analyze Repository" to start.</p>
+      <p style="margin-top:12px;font-size:12px;color:var(--text-dim)">
+        This will fetch merged PRs, reviews, and comments, then classify by category,
+        build reviewer profiles, extract patterns, and generate tool-specific guidance.
+      </p>
+    </div>`;
+    return;
+  }
+
+  const byCat = stats.comments?.by_category || {};
+  const maxCat = Math.max(...Object.values(byCat), 1);
+
+  const prsByRepo = stats.prs_collected || {};
+  delete prsByRepo._total;
+
+  let html = `
+    <div class="intel-grid">
+      <div class="intel-card">
+        <h3>PRs Analyzed</h3>
+        <div class="intel-big-num">${prTotal.toLocaleString()}</div>
+        <div class="intel-label">merged PRs from ${Object.keys(prsByRepo).length} repos</div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:3px">
+          ${Object.entries(prsByRepo).sort((a,b)=>b[1]-a[1]).map(([repo,cnt]) =>
+            `<div style="display:flex;justify-content:space-between;font-size:11px">
+              <span style="color:var(--text-muted)">${repo.split('/')[1]}</span>
+              <span style="font-family:var(--font-mono);color:var(--text-dim)">${cnt}</span>
+            </div>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="intel-card">
+        <h3>Review Comments</h3>
+        <div class="intel-big-num">${commentTotal.toLocaleString()}</div>
+        <div class="intel-label">human review comments collected</div>
+      </div>
+      <div class="intel-card">
+        <h3>Patterns</h3>
+        <div class="intel-big-num">${patternCount}</div>
+        <div class="intel-label">recurring review patterns extracted</div>
+      </div>
+    </div>
+
+    <div class="intel-card" style="margin-bottom:16px">
+        <h3>Category Distribution</h3>
+        <div class="intel-bar-chart">
+          ${Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,cnt]) => `
+            <div class="intel-bar-row">
+              <div class="intel-bar-label">${cat.replace('_',' ')}</div>
+              <div class="intel-bar-track">
+                <div class="intel-bar-fill cat-${cat}" style="width:${(cnt/maxCat*100).toFixed(1)}%"></div>
+              </div>
+              <div class="intel-bar-count">${cnt}</div>
+            </div>
+          `).join('')}
+        </div>
+    </div>
+
+    <div class="intel-card" style="margin-top:16px">
+      <h3>Top Patterns</h3>
+      <div class="intel-pattern-list">
+        ${patterns.slice(0,15).map(p => `
+          <div class="intel-pattern-item">
+            <div class="intel-pattern-meta">
+              <span class="intel-pattern-cat">${p.category}</span>
+              <span class="intel-pattern-freq">${p.frequency}x</span>
+            </div>
+            <div class="intel-pattern-text">${escapeHtml(p.pattern)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+/* ---- AI Readiness ---- */
+let readinessLastScan = null;
+let readinessGeneratedFiles = null;
+let readinessHistoryLoaded = false;
+
+async function scanReadiness() {
+  const input = document.getElementById('readinessRepoUrl');
+  const url = input.value.trim();
+  if (!url) { input.focus(); return; }
+
+  const btn = document.getElementById('readinessScanBtn');
+  const spinner = document.getElementById('readinessSpinner');
+  const resultDiv = document.getElementById('readinessResult');
+  btn.disabled = true;
+  spinner.style.display = 'flex';
+  resultDiv.className = 'readiness-result';
+  resultDiv.innerHTML = '';
+  readinessGeneratedFiles = null;
+
+  try {
+    const resp = await fetch('/api/readiness/scan', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({repo_url: url}),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    readinessLastScan = {url, ...data};
+    renderReadinessResult(data);
+    loadReadinessHistory();
+  } catch (err) {
+    resultDiv.className = 'readiness-result visible';
+    resultDiv.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px">Scan failed: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function renderReadinessResult(data) {
+  const {scan, score} = data;
+  const resultDiv = document.getElementById('readinessResult');
+  const cats = score.categories;
+
+  const catLabels = {
+    agent_config: 'Agent Configuration',
+    documentation: 'Documentation',
+    ci_quality: 'CI/CD & Quality',
+    code_structure: 'Code Structure',
+    security: 'Security & Safety',
+  };
+
+  let catCards = '';
+  for (const [key, label] of Object.entries(catLabels)) {
+    const cat = cats[key];
+    if (!cat) continue;
+    const pct = Math.round((cat.score / cat.max) * 100);
+    const findingsHtml = cat.findings.map(f =>
+      `<li><span class="${f.present ? 'check' : 'miss'}">${f.present ? '\u2713' : '\u2717'}</span> ${escapeHtml(f.label)} ${f.points ? `<span style="color:var(--accent);font-family:var(--font-mono)">+${f.points}</span>` : ''}</li>`
+    ).join('');
+    catCards += `
+      <div class="readiness-cat-card">
+        <h4>${label} <span>${cat.score}/${cat.max}</span></h4>
+        <div class="readiness-bar-track"><div class="readiness-bar-fill" style="width:${pct}%;background:${pct >= 80 ? 'var(--green)' : pct >= 50 ? 'var(--orange)' : 'var(--red)'}"></div></div>
+        <ul class="readiness-findings">${findingsHtml}</ul>
+      </div>`;
+  }
+
+  const toolFiles = [
+    {name: 'AGENTS.md', icon: '📋'},
+    {name: 'CLAUDE.md', icon: '🤖'},
+    {name: 'GEMINI.md', icon: '♊'},
+    {name: '.cursor/rules/', icon: '🔧'},
+    {name: '.github/copilot-instructions.md', icon: '🧑‍✈️'},
+    {name: '.codex/config.toml', icon: '📦'},
+  ];
+  const agentFindings = cats.agent_config?.findings || [];
+  const toolCompatHtml = toolFiles.map(t => {
+    const found = agentFindings.some(f => f.present && f.label.toLowerCase().includes(t.name.split('/')[0].replace('.','').toLowerCase()));
+    return `<span class="tool-compat-chip ${found ? 'present' : 'missing'}">${t.icon} ${t.name} ${found ? '✓' : '✗'}</span>`;
+  }).join('');
+
+  let recsHtml = '';
+  if (score.recommendations && score.recommendations.length) {
+    recsHtml = `<div class="readiness-recs"><h4>Recommendations</h4><ul>${
+      score.recommendations.map(r =>
+        `<li><span class="rec-priority ${r.priority}">${r.priority}</span> ${escapeHtml(r.text)} <span class="rec-impact">${r.impact}</span></li>`
+      ).join('')
+    }</ul></div>`;
+  }
+
+  const langBadges = scan.languages ? Object.keys(scan.languages).slice(0, 5).map(l =>
+    `<span style="background:var(--surface);border:1px solid var(--border);padding:1px 6px;border-radius:3px;font-size:10px;font-family:var(--font-mono)">${l}</span>`
+  ).join(' ') : '';
+
+  const normalized = score.total;
+  const rawInfo = score.raw_total !== undefined ? ` <span style="font-size:11px;color:var(--text-dim)">(${score.raw_total}/${score.raw_max} raw)</span>` : '';
+
+  resultDiv.innerHTML = `
+    <div class="readiness-header">
+      <div class="grade-badge grade-${score.grade}">${score.grade}</div>
+      <div class="readiness-header-info">
+        <h3>${escapeHtml(scan.full_name)}</h3>
+        <div class="rh-meta">${escapeHtml(scan.description || 'No description')} ${scan.visibility === 'private' ? '<span style="color:var(--orange)">(private)</span>' : ''}</div>
+        <div class="readiness-score-total">${normalized}/100${rawInfo} ${langBadges}</div>
+      </div>
+    </div>
+    <div style="margin:16px 0">
+      <h4 style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Tool Compatibility</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">${toolCompatHtml}</div>
+    </div>
+    <div class="readiness-categories">${catCards}</div>
+    ${recsHtml}
+    <div class="readiness-actions">
+      <button class="primary" onclick="generateReadinessFiles()">Generate AI-Ready Files</button>
+      <button onclick="downloadReadinessZip()" id="readinessDownloadBtn" disabled>Download ZIP</button>
+      <button onclick="createReadinessPR()" id="readinessPrBtn" disabled>Create Draft PR</button>
+    </div>
+    <div class="readiness-files-preview" id="readinessFilesPreview"></div>
+  `;
+  resultDiv.className = 'readiness-result visible';
+}
+
+async function generateReadinessFiles() {
+  if (!readinessLastScan) return;
+  const preview = document.getElementById('readinessFilesPreview');
+  preview.className = 'readiness-files-preview visible';
+  preview.innerHTML = '<div class="readiness-spinner"><div class="rm-spinner"></div><span>Generating files...</span></div>';
+
+  try {
+    const resp = await fetch('/api/readiness/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({repo_url: readinessLastScan.url}),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    readinessGeneratedFiles = data.files;
+    document.getElementById('readinessDownloadBtn').disabled = false;
+    document.getElementById('readinessPrBtn').disabled = false;
+    renderFilePreview(data.files);
+  } catch (err) {
+    preview.innerHTML = `<div style="padding:16px;color:var(--red);font-size:12px">Generation failed: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderFilePreview(files) {
+  const preview = document.getElementById('readinessFilesPreview');
+  const names = Object.keys(files);
+  if (!names.length) { preview.innerHTML = '<div style="padding:16px;color:var(--text-dim)">No files to generate -- repo already has all AI-ready files!</div>'; return; }
+
+  const tabs = names.map((n, i) =>
+    `<button class="readiness-file-tab ${i === 0 ? 'active' : ''}" onclick="switchFileTab(this,'${n.replace(/'/g,"\\'")}')\">${n}</button>`
+  ).join('');
+
+  preview.innerHTML = `
+    <div class="readiness-file-tabs">${tabs}</div>
+    <div class="readiness-file-content"><pre id="readinessFileBody">${escapeHtml(files[names[0]])}</pre></div>
+  `;
+}
+
+function switchFileTab(btn, name) {
+  document.querySelectorAll('.readiness-file-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('readinessFileBody').textContent = readinessGeneratedFiles[name] || '';
+}
+
+function downloadReadinessZip() {
+  if (!readinessGeneratedFiles) return;
+  const files = readinessGeneratedFiles;
+  let text = '';
+  for (const [name, content] of Object.entries(files)) {
+    text += `${'='.repeat(60)}\n`;
+    text += `FILE: ${name}\n`;
+    text += `${'='.repeat(60)}\n`;
+    text += content + '\n\n';
+  }
+  const blob = new Blob([text], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ai-readiness-files-${readinessLastScan.scan.full_name.replace('/', '-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function createReadinessPR() {
+  if (!readinessGeneratedFiles || !readinessLastScan) return;
+  const btn = document.getElementById('readinessPrBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating PR...';
+
+  try {
+    const resp = await fetch('/api/readiness/create-pr', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        repo_url: readinessLastScan.url,
+        files: readinessGeneratedFiles,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    btn.textContent = 'PR Created!';
+    btn.style.borderColor = 'var(--green)';
+    btn.style.color = 'var(--green)';
+    window.open(data.pr_url, '_blank');
+    setTimeout(() => {
+      btn.textContent = 'Create Draft PR';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+      btn.disabled = false;
+    }, 3000);
+  } catch (err) {
+    btn.textContent = 'Failed';
+    btn.style.color = 'var(--red)';
+    alert('PR creation failed: ' + err.message);
+    setTimeout(() => {
+      btn.textContent = 'Create Draft PR';
+      btn.style.color = '';
+      btn.disabled = false;
+    }, 2000);
+  }
+}
+
+async function loadReadinessHistory() {
+  const container = document.getElementById('readinessHistory');
+  try {
+    const resp = await fetch('/api/readiness/history');
+    const rows = await resp.json();
+    if (!rows.length) {
+      container.innerHTML = '<h4>Scan History</h4><div style="padding:16px;color:var(--text-dim);font-size:12px;text-align:center">No scans yet. Enter a repository URL above to get started.</div>';
+      return;
+    }
+    const tbody = rows.map(r => `
+      <tr>
+        <td><strong>${escapeHtml(r.owner + '/' + r.repo)}</strong></td>
+        <td><span class="history-grade grade-${r.grade}">${r.grade}</span></td>
+        <td style="font-family:var(--font-mono)">${r.score_total}/100</td>
+        <td style="font-family:var(--font-mono);color:var(--text-muted)">${r.scanned_at ? new Date(r.scanned_at).toLocaleDateString() : ''}</td>
+        <td><button class="history-rescan" onclick="document.getElementById('readinessRepoUrl').value='${escapeHtml(r.repo_url)}';scanReadiness()">Re-scan</button></td>
+      </tr>
+    `).join('');
+    container.innerHTML = `
+      <h4>Scan History</h4>
+      <table class="readiness-history-table">
+        <thead><tr><th>Repository</th><th>Grade</th><th>Score</th><th>Date</th><th></th></tr></thead>
+        <tbody>${tbody}</tbody>
+      </table>`;
+  } catch (err) {
+    container.innerHTML = '';
+  }
+}
+</script>
+
+<div class="stretch-toast" id="stretchToast"></div>
+
+</body>
+</html>

@@ -1,0 +1,523 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import logging.handlers
+import signal
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+
+from config import settings
+from database import (
+    init_db, get_my_prs, get_assigned_prs, get_review_requests,
+    get_recent_activities, get_jira_tasks, get_jira_stats,
+    get_active_sprints, get_sprint_tasks, get_yearly_completions,
+    get_today_events, get_tomorrow_events,
+)
+from pollers import poll_all
+from reviewer import (
+    get_available_providers, review_pr, post_review,
+    fetch_pr_diff, sanitize_diff, build_review_prompt,
+)
+
+LOG_DIR = settings.log_dir
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+handlers: list[logging.Handler] = [
+    logging.StreamHandler(sys.stdout),
+    logging.handlers.RotatingFileHandler(
+        LOG_DIR / "workstream.log",
+        maxBytes=5 * 1024 * 1024,
+        backupCount=3,
+    ),
+]
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    handlers=handlers,
+)
+logger = logging.getLogger("dashboard")
+
+STATIC_DIR = Path(__file__).parent / "static"
+
+poll_task: asyncio.Task | None = None
+
+
+async def _poll_loop() -> None:
+    while True:
+        try:
+            await poll_all()
+        except Exception:
+            logger.exception("Poll loop error")
+        await asyncio.sleep(settings.poll_interval_seconds)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global poll_task
+    await init_db()
+    poll_task = asyncio.create_task(_poll_loop())
+    logger.info(
+        "Workstream started -- polling every %ds. Open http://localhost:8080",
+        settings.poll_interval_seconds,
+    )
+    yield
+    if poll_task:
+        poll_task.cancel()
+        try:
+            await poll_task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="Workstream", lifespan=lifespan)
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/")
+async def index():
+    return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+@app.get("/api/config")
+async def api_config():
+    """Expose non-secret configuration to the frontend."""
+    return JSONResponse({
+        "jira_url": settings.jira_url,
+        "jira_board_projects": settings.jira_board_projects,
+        "display_name": settings.display_name,
+    })
+
+
+@app.get("/api/my-prs")
+async def api_my_prs():
+    prs = await get_my_prs(settings.github_username, settings.gitlab_username)
+    return JSONResponse(prs)
+
+
+@app.get("/api/assigned")
+async def api_assigned():
+    prs = await get_assigned_prs(settings.github_username, settings.gitlab_username)
+    return JSONResponse(prs)
+
+
+@app.get("/api/review-requests")
+async def api_review_requests():
+    prs = await get_review_requests(settings.github_username, settings.gitlab_username)
+    return JSONResponse(prs)
+
+
+@app.get("/api/activity")
+async def api_activity():
+    activities = await get_recent_activities(limit=100)
+    return JSONResponse(activities)
+
+
+@app.get("/api/jira-tasks")
+async def api_jira_tasks(role: str = "all", status: str = "all", sprint: str = "all"):
+    tasks = await get_jira_tasks(role_filter=role, status_category=status, sprint=sprint)
+    return JSONResponse(tasks)
+
+
+@app.get("/api/jira-stats")
+async def api_jira_stats():
+    stats = await get_jira_stats()
+    return JSONResponse(stats)
+
+
+@app.get("/api/sprint-info")
+async def api_sprint_info():
+    sprints = await get_active_sprints()
+    seen_sprint_ids: set[int] = set()
+    result = []
+    for s in sprints:
+        sid = s["sprint_id"]
+        if sid in seen_sprint_ids:
+            continue
+        seen_sprint_ids.add(sid)
+        # Aggregate tasks across all projects sharing this sprint
+        matching = [sp for sp in sprints if sp["sprint_id"] == sid]
+        projects = [sp["project"] for sp in matching]
+        boards = {sp["project"]: sp["board_id"] for sp in matching}
+        merged_tasks = {"new": 0, "in_progress": 0, "in_review": 0, "done": 0, "total": 0}
+        for proj in projects:
+            t = await get_sprint_tasks(proj)
+            for k in merged_tasks:
+                merged_tasks[k] += t.get(k, 0)
+        result.append({
+            **s,
+            "projects": projects,
+            "boards": boards,
+            "my_tasks": merged_tasks,
+        })
+    return JSONResponse(result)
+
+
+@app.get("/api/yearly-completions")
+async def api_yearly_completions():
+    rows = await get_yearly_completions()
+    return JSONResponse(rows)
+
+
+@app.get("/api/calendar/today")
+async def api_calendar_today():
+    events = await get_today_events()
+    return JSONResponse(events)
+
+
+@app.get("/api/calendar/tomorrow")
+async def api_calendar_tomorrow():
+    events = await get_tomorrow_events()
+    return JSONResponse(events)
+
+
+@app.post("/api/refresh")
+async def api_refresh():
+    await poll_all()
+    return JSONResponse({"status": "ok"})
+
+
+@app.get("/api/stats")
+async def api_stats():
+    all_my_prs = await get_my_prs(settings.github_username, settings.gitlab_username, include_closed=True)
+    assigned = await get_assigned_prs(settings.github_username, settings.gitlab_username)
+    reviews = await get_review_requests(settings.github_username, settings.gitlab_username)
+    jira = await get_jira_stats()
+
+    open_count = sum(1 for p in all_my_prs if p["state"] in ("open", "draft"))
+    merged_count = sum(1 for p in all_my_prs if p["state"] == "merged")
+    draft_count = sum(1 for p in all_my_prs if p["is_draft"] and p["state"] == "draft")
+    ci_failing = sum(1 for p in all_my_prs if p["ci_status"] == "failing" and p["state"] in ("open", "draft"))
+
+    return JSONResponse({
+        "open_prs": open_count,
+        "merged_prs": merged_count,
+        "draft_prs": draft_count,
+        "ci_failing": ci_failing,
+        "assigned_prs": len(assigned),
+        "pending_reviews": len(reviews),
+        "jira_tasks": jira.get("total", 0),
+        "jira_in_sprint": jira.get("in_sprint", 0),
+    })
+
+
+@app.get("/api/review/providers")
+async def api_review_providers():
+    providers = await get_available_providers()
+    return JSONResponse(providers)
+
+
+@app.post("/api/review/prompt")
+async def api_review_prompt(request: Request):
+    """Return the full review prompt so the user can paste it into any LLM."""
+    body = await request.json()
+    pr_id = body.get("pr_id", "")
+    if not pr_id:
+        return JSONResponse({"error": "pr_id is required"}, status_code=400)
+    try:
+        diff_raw, metadata = await fetch_pr_diff(pr_id)
+        diff_clean = sanitize_diff(diff_raw)
+        system, user = build_review_prompt(metadata, diff_clean, pr_id=pr_id)
+        full_prompt = f"{system}\n\n---\n\n{user}"
+        return JSONResponse({"prompt": full_prompt, "metadata": metadata})
+    except Exception as exc:
+        logger.exception("Failed to generate review prompt for %s", pr_id)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/review")
+async def api_review(request: Request):
+    body = await request.json()
+    pr_id = body.get("pr_id", "")
+    provider = body.get("provider", "")
+    if not pr_id or not provider:
+        return JSONResponse({"error": "pr_id and provider are required"}, status_code=400)
+    try:
+        result = await review_pr(pr_id, provider)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.exception("AI review failed for %s via %s", pr_id, provider)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/review/post")
+async def api_review_post(request: Request):
+    body = await request.json()
+    pr_id = body.get("pr_id", "")
+    comments = body.get("comments", [])
+    if not pr_id or not comments:
+        return JSONResponse({"error": "pr_id and comments are required"}, status_code=400)
+    try:
+        result = await post_review(pr_id, comments)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.exception("Failed to post review for %s", pr_id)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# AI Readiness endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/readiness/scan")
+async def api_readiness_scan(request: Request):
+    """Scan a GitHub repo for AI/agentic readiness and return score."""
+    from agentic_readiness.scanner import scan_repo
+    from agentic_readiness.scorer import score_repo
+    from database import insert_readiness_scan
+    import json
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required"}, status_code=400)
+    try:
+        scan_result = await scan_repo(repo_url)
+        score_result = score_repo(scan_result)
+
+        await insert_readiness_scan({
+            "repo_url": repo_url,
+            "owner": scan_result["owner"],
+            "repo": scan_result["repo"],
+            "score_total": score_result["total"],
+            "score_agent_config": score_result["categories"]["agent_config"]["score"],
+            "score_documentation": score_result["categories"]["documentation"]["score"],
+            "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
+            "score_code_structure": score_result["categories"]["code_structure"]["score"],
+            "score_security": score_result["categories"]["security"]["score"],
+            "grade": score_result["grade"],
+            "findings": json.dumps(score_result),
+            "scanned_at": scan_result["scanned_at"],
+        })
+
+        return JSONResponse({
+            "scan": {
+                "full_name": scan_result["full_name"],
+                "description": scan_result["description"],
+                "primary_language": scan_result["primary_language"],
+                "languages": scan_result["languages"],
+                "default_branch": scan_result["default_branch"],
+                "visibility": scan_result["visibility"],
+                "has_ci": scan_result["has_ci"],
+                "ci_workflows": scan_result["ci_workflows"],
+            },
+            "score": score_result,
+        })
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.exception("Readiness scan failed for %s", repo_url)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/readiness/generate")
+async def api_readiness_generate(request: Request):
+    """Generate AI-ready files for a repo based on scan."""
+    from agentic_readiness.scanner import scan_repo
+    from agentic_readiness.scorer import score_repo
+    from agentic_readiness.generator import generate_files
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required"}, status_code=400)
+    try:
+        scan_result = await scan_repo(repo_url)
+        score_result = score_repo(scan_result)
+        files = generate_files(scan_result, score_result)
+        return JSONResponse({"files": files, "full_name": scan_result["full_name"]})
+    except Exception as exc:
+        logger.exception("File generation failed for %s", repo_url)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/readiness/create-pr")
+async def api_readiness_create_pr(request: Request):
+    """Create a draft PR with generated AI-readiness files."""
+    from agentic_readiness.scanner import parse_repo_url
+    from agentic_readiness.generator import create_draft_pr
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    files = body.get("files", {})
+    branch = body.get("branch", "add-ai-readiness-files")
+    if not repo_url or not files:
+        return JSONResponse({"error": "repo_url and files are required"}, status_code=400)
+    try:
+        owner, repo = parse_repo_url(repo_url)
+        result = await create_draft_pr(owner, repo, files, branch_name=branch)
+        if "error" in result:
+            return JSONResponse(result, status_code=400)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.exception("PR creation failed for %s", repo_url)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/readiness/history")
+async def api_readiness_history():
+    """Return recent scan history."""
+    from database import get_readiness_history
+    rows = await get_readiness_history()
+    return JSONResponse(rows)
+
+
+@app.get("/api/intelligence/stats")
+async def api_intelligence_stats():
+    from intelligence.db import get_ri_statistics
+    stats = await get_ri_statistics()
+    return JSONResponse(stats)
+
+
+@app.get("/api/intelligence/patterns")
+async def api_intelligence_patterns(category: str = "", repo: str = ""):
+    from intelligence.db import get_patterns
+    patterns = await get_patterns(category=category, repo=repo)
+    return JSONResponse(patterns)
+
+
+@app.get("/api/intelligence/reviewers")
+async def api_intelligence_reviewers():
+    from intelligence.db import get_all_reviewer_profiles
+    profiles = await get_all_reviewer_profiles()
+    return JSONResponse(profiles)
+
+
+# ---------------------------------------------------------------------------
+# Intelligence collection endpoints (background tasks)
+# ---------------------------------------------------------------------------
+
+_intel_tasks: dict[str, dict] = {}
+
+
+async def _run_intel_collection(task_id: str, repo_slug: str):
+    """Background coroutine for intelligence collection + analysis."""
+    from intelligence.collector import collect_repo
+    from intelligence.analyzer import run_full_analysis, generate_tool_insights
+
+    task = _intel_tasks[task_id]
+    try:
+        task["stage"] = "collecting"
+        task["message"] = f"Collecting PRs and reviews for {repo_slug}..."
+
+        def progress_cb(repo, done, total, comments):
+            task["prs_done"] = done
+            task["prs_total"] = total
+            task["comments"] = comments
+            task["percent"] = round(done / max(total, 1) * 60)
+            task["message"] = f"Collected {done}/{total} PRs, {comments} comments..."
+
+        stats = await collect_repo(repo_slug, progress_callback=progress_cb)
+        task["collect_stats"] = stats
+
+        task["stage"] = "analyzing"
+        task["percent"] = 65
+        task["message"] = "Classifying comments and extracting patterns..."
+        analysis = await run_full_analysis()
+        task["analysis"] = analysis
+
+        task["stage"] = "insights"
+        task["percent"] = 85
+        task["message"] = "Generating tool-specific insights..."
+        insights = await generate_tool_insights(repo_slug)
+        task["insights"] = insights
+
+        task["stage"] = "done"
+        task["percent"] = 100
+        task["done"] = True
+        task["message"] = "Collection and analysis complete"
+
+    except Exception as exc:
+        logger.exception("Intelligence collection failed for %s", repo_slug)
+        task["stage"] = "error"
+        task["error"] = str(exc)
+        task["done"] = True
+
+
+@app.post("/api/intelligence/collect")
+async def api_intelligence_collect(request: Request):
+    """Start background collection for any GitHub repo."""
+    from intelligence.collector import parse_repo_url
+    import uuid
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required"}, status_code=400)
+
+    try:
+        repo_slug = parse_repo_url(repo_url)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+    task_id = str(uuid.uuid4())[:8]
+    _intel_tasks[task_id] = {
+        "task_id": task_id,
+        "repo": repo_slug,
+        "stage": "queued",
+        "message": "Starting...",
+        "percent": 0,
+        "prs_done": 0,
+        "prs_total": 0,
+        "comments": 0,
+        "done": False,
+        "error": None,
+    }
+
+    asyncio.create_task(_run_intel_collection(task_id, repo_slug))
+    return JSONResponse({"task_id": task_id, "repo": repo_slug})
+
+
+@app.get("/api/intelligence/progress/{task_id}")
+async def api_intelligence_progress(task_id: str):
+    """Poll collection progress."""
+    task = _intel_tasks.get(task_id)
+    if not task:
+        return JSONResponse({"error": "Task not found"}, status_code=404)
+    return JSONResponse(task)
+
+
+@app.get("/api/intelligence/repo/{owner}/{repo}")
+async def api_intelligence_repo(owner: str, repo: str):
+    """Return full intelligence data for a specific repo."""
+    from intelligence.db import get_repo_intelligence
+    from intelligence.analyzer import generate_tool_insights
+
+    repo_slug = f"{owner}/{repo}"
+    intel = await get_repo_intelligence(repo_slug)
+
+    if intel.get("pr_count", 0) > 0:
+        insights = await generate_tool_insights(repo_slug)
+        intel["insights"] = insights
+
+    return JSONResponse(intel)
+
+
+@app.get("/api/intelligence/repos")
+async def api_intelligence_repos():
+    """Return list of repos with collection stats."""
+    from intelligence.db import get_collected_repos
+    repos = await get_collected_repos()
+    return JSONResponse(repos)
+
+
+if __name__ == "__main__":
+    import os
+    import uvicorn
+
+    def _handle_signal(signum, _frame):
+        sig_name = signal.Signals(signum).name
+        logger.info("Received %s — shutting down gracefully", sig_name)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    logger.info("Workstream PID %d starting on http://localhost:8080", os.getpid())
+    uvicorn.run("app:app", host="0.0.0.0", port=8080)

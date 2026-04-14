@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+# workstream — manage the Workstream dashboard service
+set -euo pipefail
+
+LABEL="com.workstream.dashboard"
+PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+DASHBOARD_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_DIR="$DASHBOARD_DIR/logs"
+
+PYTHON="$DASHBOARD_DIR/venv/bin/python"
+
+usage() {
+    cat <<EOF
+Usage: workstream <command>
+
+Commands:
+  start              Start the Workstream service
+  stop               Stop the Workstream service
+  restart            Restart the service
+  status             Show whether the service is running
+  open               Open the dashboard in your browser
+  logs               Tail the application log
+  collect-reviews    Collect historical PR reviews from release-service repos
+  collect <url>      Collect + analyze PR reviews for any GitHub repo
+  analyze-reviews    Run pattern analysis on collected review data
+  review-stats       Show review intelligence statistics
+  scan-repo <url>    Scan a GitHub repo for AI/agentic readiness
+  mcp-status         Check if the Release Service MCP server is healthy
+  help               Show this help message
+EOF
+}
+
+is_loaded() {
+    launchctl list "$LABEL" &>/dev/null
+}
+
+get_pid() {
+    launchctl list "$LABEL" 2>/dev/null | awk -F'= ' '/\"PID\"/{gsub(/[^0-9]/,"",$2); print $2}'
+}
+
+cmd_start() {
+    if ! [ -f "$PLIST" ]; then
+        echo "Error: LaunchAgent not installed. Run install.sh first."
+        exit 1
+    fi
+    if is_loaded; then
+        echo "Workstream is already running (PID $(get_pid))."
+    else
+        launchctl load "$PLIST"
+        sleep 1
+        echo "Workstream started (PID $(get_pid))."
+    fi
+}
+
+cmd_stop() {
+    if is_loaded; then
+        launchctl unload "$PLIST"
+        echo "Workstream stopped."
+    else
+        echo "Workstream is not running."
+    fi
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 1
+    cmd_start
+}
+
+cmd_status() {
+    if is_loaded; then
+        local pid
+        pid=$(get_pid)
+        if [ "$pid" != "-" ] && [ -n "$pid" ]; then
+            echo "Workstream is running (PID $pid)."
+            echo "Dashboard: http://localhost:8080"
+        else
+            echo "Workstream is loaded but not currently running (will auto-restart)."
+        fi
+    else
+        echo "Workstream is not running."
+    fi
+}
+
+cmd_open() {
+    open "http://localhost:8080"
+}
+
+cmd_logs() {
+    local logfile="$LOG_DIR/workstream.log"
+    if [ -f "$logfile" ]; then
+        tail -f "$logfile"
+    else
+        echo "No log file found at $logfile"
+        echo "The service may not have started yet."
+    fi
+}
+
+load_env() {
+    if [ -f "$DASHBOARD_DIR/.env" ]; then
+        set -a
+        source "$DASHBOARD_DIR/.env"
+        set +a
+    fi
+}
+
+cmd_collect_reviews() {
+    echo "Collecting historical PR reviews from release-service repos..."
+    echo "This may take several minutes depending on API rate limits."
+    load_env
+    cd "$DASHBOARD_DIR"
+    "$PYTHON" -c "
+import asyncio, sys
+sys.path.insert(0, '.')
+from intelligence.collector import collect_all
+def progress(repo, current, total, comments):
+    print(f'  {repo}: {current}/{total} PRs, {comments} comments', flush=True)
+results = asyncio.run(collect_all(progress_callback=progress))
+total_prs = sum(s.get('prs', 0) for s in results)
+total_comments = sum(s.get('comments', 0) for s in results)
+print(f'\nDone! Collected {total_prs} PRs with {total_comments} review comments.')
+for s in results:
+    status = 'ERROR' if s.get('error') else 'OK'
+    print(f'  {s[\"repo\"]}: {s.get(\"prs\", 0)} PRs, {s.get(\"comments\", 0)} comments [{status}]')
+"
+}
+
+cmd_collect() {
+    local repo_url="${1:-}"
+    if [ -z "$repo_url" ]; then
+        echo "Usage: workstream collect <github-repo-url>"
+        echo "Example: workstream collect https://github.com/konflux-ci/release-service"
+        echo ""
+        echo "Collects PR reviews, analyzes patterns, and generates tool-specific insights."
+        exit 1
+    fi
+    echo "Collecting and analyzing reviews for $repo_url..."
+    echo "This may take several minutes depending on repo size and API rate limits."
+    load_env
+    cd "$DASHBOARD_DIR"
+    "$PYTHON" -c "
+import asyncio, sys
+sys.path.insert(0, '.')
+from intelligence.collector import collect_repo, parse_repo_url
+from intelligence.analyzer import run_full_analysis, generate_tool_insights
+
+repo_slug = parse_repo_url('$repo_url')
+print(f'Repository: {repo_slug}')
+
+def progress(repo, current, total, comments):
+    print(f'  Collecting: {current}/{total} PRs, {comments} comments', flush=True)
+
+print('\n--- Stage 1: Collecting PRs and reviews ---')
+stats = asyncio.run(collect_repo(repo_slug, progress_callback=progress))
+print(f'Collected {stats[\"prs\"]} PRs with {stats[\"comments\"]} comments')
+
+print('\n--- Stage 2: Analyzing patterns ---')
+analysis = asyncio.run(run_full_analysis())
+print(f'Classified {analysis[\"classification\"].get(\"classified\", 0)} comments')
+print(f'Built {analysis[\"profiles_built\"]} reviewer profiles')
+print(f'Extracted {analysis[\"patterns_extracted\"]} patterns')
+
+print('\n--- Stage 3: Generating tool insights ---')
+insights = asyncio.run(generate_tool_insights(repo_slug))
+if insights.get('claude_md_rules'):
+    print(f'\nCLAUDE.md rules ({len(insights[\"claude_md_rules\"])}):')
+    for r in insights['claude_md_rules']:
+        print(f'  - {r}')
+if insights.get('cursor_rules'):
+    print(f'\n.cursor/rules guidance ({len(insights[\"cursor_rules\"])}):')
+    for r in insights['cursor_rules']:
+        print(f'  - {r}')
+if insights.get('agents_md_conventions'):
+    print(f'\nAGENTS.md conventions ({len(insights[\"agents_md_conventions\"])}):')
+    for r in insights['agents_md_conventions']:
+        print(f'  - {r}')
+
+print('\nDone! View full results at http://localhost:8080 > Intelligence tab')
+"
+}
+
+cmd_analyze_reviews() {
+    echo "Analyzing collected review data..."
+    load_env
+    cd "$DASHBOARD_DIR"
+    "$PYTHON" -c "
+import asyncio, sys, json
+sys.path.insert(0, '.')
+from intelligence.analyzer import run_full_analysis
+result = asyncio.run(run_full_analysis())
+cls = result.get('classification', {})
+print(f'Classified: {cls.get(\"classified\", 0)} comments')
+if cls.get('categories'):
+    for cat, cnt in sorted(cls['categories'].items(), key=lambda x: -x[1]):
+        print(f'  {cat}: {cnt}')
+print(f'Reviewer profiles built: {result.get(\"profiles_built\", 0)}')
+print(f'Patterns extracted: {result.get(\"patterns_extracted\", 0)}')
+print('\nAnalysis complete! Data is now available via the MCP server and dashboard.')
+"
+}
+
+cmd_review_stats() {
+    load_env
+    cd "$DASHBOARD_DIR"
+    "$PYTHON" -c "
+import asyncio, sys, json
+sys.path.insert(0, '.')
+from intelligence.db import get_ri_statistics
+stats = asyncio.run(get_ri_statistics())
+prs = stats.get('prs_collected', {})
+total = prs.pop('_total', 0)
+print(f'Review Intelligence Statistics')
+print(f'==============================')
+print(f'Total PRs collected: {total}')
+if prs:
+    for repo, cnt in sorted(prs.items(), key=lambda x: -x[1]):
+        print(f'  {repo}: {cnt}')
+comments = stats.get('comments', {})
+print(f'\nTotal review comments: {comments.get(\"total\", 0)}')
+by_cat = comments.get('by_category', {})
+if by_cat:
+    print('By category:')
+    for cat, cnt in sorted(by_cat.items(), key=lambda x: -x[1]):
+        print(f'  {cat}: {cnt}')
+by_rev = comments.get('by_reviewer', {})
+if by_rev:
+    print(f'\nTop reviewers:')
+    for rev, cnt in list(by_rev.items())[:10]:
+        print(f'  {rev}: {cnt} comments')
+print(f'\nPatterns extracted: {stats.get(\"pattern_count\", 0)}')
+print(f'Reviewer profiles: {stats.get(\"reviewer_count\", 0)}')
+"
+}
+
+cmd_mcp_status() {
+    echo "Checking Release Service MCP server..."
+    if "$PYTHON" -c "
+import sys
+sys.path.insert(0, '$DASHBOARD_DIR')
+from mcp_server.tools import get_review_statistics
+stats = get_review_statistics()
+print(f'MCP server module: OK')
+print(f'Database connected: OK')
+print(f'PRs in DB: {stats[\"total_prs_analyzed\"]}')
+print(f'Comments in DB: {stats[\"total_comments\"]}')
+print(f'Patterns: {stats[\"pattern_count\"]}')
+" 2>&1; then
+        echo "MCP server is healthy."
+    else
+        echo "MCP server check failed. Ensure the venv has 'mcp[cli]' installed."
+    fi
+}
+
+cmd_scan_repo() {
+    local repo_url="${1:-}"
+    if [ -z "$repo_url" ]; then
+        echo "Usage: workstream scan-repo <github-repo-url>"
+        echo "Example: workstream scan-repo https://github.com/konflux-ci/release-service"
+        exit 1
+    fi
+    echo "Scanning $repo_url for AI/agentic readiness..."
+    load_env
+    cd "$DASHBOARD_DIR"
+    "$PYTHON" -c "
+import asyncio, sys, json
+sys.path.insert(0, '.')
+from agentic_readiness.scanner import scan_repo
+from agentic_readiness.scorer import score_repo
+
+scan = asyncio.run(scan_repo('$repo_url'))
+result = score_repo(scan)
+
+grade = result['grade']
+total = result['total']
+colors = {'A': '\033[32m', 'B': '\033[34m', 'C': '\033[33m', 'D': '\033[31m', 'F': '\033[31m'}
+reset = '\033[0m'
+color = colors.get(grade, '')
+print(f'\n{color}Grade: {grade} ({total}/100){reset}')
+print(f'Repository: {scan[\"full_name\"]}')
+print(f'Language: {scan.get(\"primary_language\", \"N/A\")}')
+print()
+
+labels = {
+    'agent_config': 'Agent Configuration',
+    'documentation': 'Documentation',
+    'ci_quality': 'CI/CD & Quality',
+    'code_structure': 'Code Structure',
+    'security': 'Security & Safety',
+}
+for key, label in labels.items():
+    cat = result['categories'][key]
+    bar = '#' * cat['score'] + '.' * (cat['max'] - cat['score'])
+    print(f'{label:25s} [{bar}] {cat[\"score\"]}/{cat[\"max\"]}')
+    for f in cat['findings']:
+        mark = '\033[32m\u2713\033[0m' if f['present'] else '\033[31m\u2717\033[0m'
+        print(f'  {mark} {f[\"label\"]}')
+    print()
+
+if result.get('recommendations'):
+    print('Recommendations:')
+    for r in result['recommendations']:
+        print(f'  [{r[\"priority\"].upper()}] {r[\"text\"]} ({r[\"impact\"]})')
+"
+}
+
+case "${1:-help}" in
+    start)            cmd_start            ;;
+    stop)             cmd_stop             ;;
+    restart)          cmd_restart          ;;
+    status)           cmd_status           ;;
+    open)             cmd_open             ;;
+    logs)             cmd_logs             ;;
+    collect-reviews)  cmd_collect_reviews  ;;
+    collect)          cmd_collect "$2"     ;;
+    analyze-reviews)  cmd_analyze_reviews  ;;
+    review-stats)     cmd_review_stats     ;;
+    scan-repo)        cmd_scan_repo "$2"   ;;
+    mcp-status)       cmd_mcp_status       ;;
+    help|-h|--help)   usage               ;;
+    *)
+        echo "Unknown command: $1"
+        usage
+        exit 1
+        ;;
+esac

@@ -1,0 +1,42 @@
+# =============================================================================
+# Workstream .gitignore
+# =============================================================================
+
+# --- Secrets & Credentials (CRITICAL - never commit these) ---
+.env
+google_credentials.json
+google_token.json
+
+# --- Databases (contain personal data) ---
+*.db
+data.db
+workstream.db
+
+# --- Python ---
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- Logs ---
+logs/
+*.log
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Generated artifacts ---
+docs/ai_readiness_paper.zip

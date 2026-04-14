@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m py_compile app.py config.py database.py pollers.py reviewer.py
+
+      - name: Check module imports
+        run: |
+          python -c "import config"
+          python -c "import database"
+          python -c "import pollers"
+          python -c "import reviewer"
+          python -c "from agentic_readiness import scanner, scorer, generator"
+          python -c "from intelligence import collector, analyzer, db"
+
+      - name: Verify no secrets in tracked files
+        run: |
+          if grep -rn "ghp_[A-Za-z0-9]\{36\}" --include="*.py" --include="*.html" --include="*.sh" .; then
+            echo "ERROR: Possible GitHub token found in source files"
+            exit 1
+          fi
+          if grep -rn "sk-ant-[A-Za-z0-9]" --include="*.py" --include="*.html" --include="*.sh" .; then
+            echo "ERROR: Possible Anthropic key found in source files"
+            exit 1
+          fi

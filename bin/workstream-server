@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Launched by the macOS LaunchAgent — sources .env and starts the server.
+set -euo pipefail
+
+DASHBOARD_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+source "$DASHBOARD_DIR/venv/bin/activate"
+
+if [ -f "$DASHBOARD_DIR/.env" ]; then
+    set -a
+    source "$DASHBOARD_DIR/.env"
+    set +a
+fi
+
+cd "$DASHBOARD_DIR"
+exec python app.py
