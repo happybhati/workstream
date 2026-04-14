@@ -4,6 +4,34 @@ Your developer command center — PRs, tasks, calendar, and AI in one dashboard.
 
 Workstream is a developer productivity dashboard that runs locally as a Python [FastAPI](https://fastapi.tiangolo.com/) app. It aggregates GitHub PRs, GitLab MRs, Jira tasks, Google Calendar, weather, AI code review, intelligence collection (historical PR review analysis), and AI readiness scanning into a single-page dashboard with dark and light mode.
 
+## Screenshots
+
+**Dashboard overview** -- PRs, calendar, sprint tracking, focus banner, stat cards, and weekly digest at a glance.
+
+![Dashboard overview (dark mode)](docs/screenshots/dashboard-overview.png)
+
+<details>
+<summary>Light mode</summary>
+
+![Dashboard overview (light mode)](docs/screenshots/dashboard-light.png)
+</details>
+
+**Jira Tasks** -- Sprint tasks grouped by status with priority badges and role filters.
+
+![Jira Tasks](docs/screenshots/jira-tasks.png)
+
+**Review Intelligence** -- Analyze historical PR reviews across any GitHub repositories to discover team patterns and review focus areas.
+
+![Intelligence tab](docs/screenshots/intelligence-tab.png)
+
+**AI Readiness Scanner** -- Score any repo for AI/agentic readiness across 5 categories, get recommendations, generate bootstrapping files, and create draft PRs.
+
+![AI Readiness scan results](docs/screenshots/readiness-scan-result.png)
+
+**AI Code Review** -- Review PRs with Claude, Gemini, Ollama, or copy a prompt for any LLM. Human approval required before posting.
+
+![AI Review modal](docs/screenshots/ai-review.png)
+
 ## Feature highlights
 
 | Area | What you get |

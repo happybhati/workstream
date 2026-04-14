@@ -1,0 +1,22 @@
+name: Documentation
+description: Report missing, incorrect, or unclear documentation
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be documented or corrected?
+      description: Describe the documentation gap or error.
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: File or section
+      description: Which file or doc section is affected?
+      placeholder: "README.md, docs/CONFIGURATION.md, etc."
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: How should the documentation read?

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Configuration Help
+    url: https://github.com/happybhati/workstream/blob/main/docs/CONFIGURATION.md
+    about: Check the configuration guide before opening an issue about setup problems.
