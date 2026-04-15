@@ -432,6 +432,8 @@ _PROVIDER_MAP = {
 
 async def review_pr(pr_id: str, provider: str) -> dict:
     """Fetch diff, sanitize, call AI, return structured review."""
+    import time as _time
+
     if provider not in _PROVIDER_MAP:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -444,7 +446,38 @@ async def review_pr(pr_id: str, provider: str) -> dict:
         provider, pr_id, len(diff_clean),
     )
 
-    result = await _PROVIDER_MAP[provider](system, user)
+    t0 = _time.monotonic()
+    error_msg = ""
+    status = "success"
+    try:
+        result = await _PROVIDER_MAP[provider](system, user)
+    except Exception as exc:
+        status = "error"
+        error_msg = str(exc)
+        raise
+    finally:
+        latency = int((_time.monotonic() - t0) * 1000)
+        try:
+            from agents.telemetry import record_event
+            input_chars = len(system) + len(user)
+            est_input_tokens = input_chars // 4
+            est_output_tokens = 500
+            model = ""
+            if provider == "claude":
+                model = settings.ai_claude_model
+            elif provider == "gemini":
+                model = settings.ai_gemini_model
+            elif provider == "ollama":
+                model = settings.ai_ollama_model
+            record_event(
+                "ai-review", "review_pr",
+                provider=provider, model=model,
+                input_tokens=est_input_tokens, output_tokens=est_output_tokens,
+                latency_ms=latency, status=status, error=error_msg,
+                metadata={"pr_id": pr_id},
+            )
+        except Exception:
+            logger.debug("Telemetry recording failed", exc_info=True)
 
     if "summary" not in result:
         result["summary"] = "Review completed."

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
@@ -49,11 +49,15 @@ poll_task: asyncio.Task | None = None
 
 
 async def _poll_loop() -> None:
+    from agents.activity_stream import emit_event
     while True:
         try:
+            emit_event("tool_start", "workstream", category="operation", data={"tool": "poll_all"})
             await poll_all()
+            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "success"})
         except Exception:
             logger.exception("Poll loop error")
+            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "error"})
         await asyncio.sleep(settings.poll_interval_seconds)
 
 
@@ -505,6 +509,118 @@ async def api_intelligence_repos():
     from intelligence.db import get_collected_repos
     repos = await get_collected_repos()
     return JSONResponse(repos)
+
+
+# ---------------------------------------------------------------------------
+# Agents Dashboard endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/agents")
+async def api_agents():
+    """Return all discovered agents with current status."""
+    from agents.registry import get_all_agents
+    return JSONResponse(get_all_agents())
+
+
+@app.post("/api/agents/refresh")
+async def api_agents_refresh():
+    """Re-scan MCP config, check health, return updated list."""
+    from agents.registry import refresh_registry
+    from agents.activity_stream import emit_event
+    emit_event("tool_start", "agent-registry", category="operation", data={"tool": "refresh_registry"})
+    agents = await refresh_registry()
+    running = sum(1 for a in agents if a.get("status") == "running")
+    emit_event("tool_end", "agent-registry", category="operation", data={
+        "tool": "refresh_registry", "total": len(agents), "running": running,
+    })
+    return JSONResponse(agents)
+
+
+@app.post("/api/agents/register")
+async def api_agents_register(request: Request):
+    """Register an external A2A agent by base URL or agent card URL."""
+    from agents.registry import fetch_a2a_agent_card, register_a2a_agent
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        return JSONResponse({"error": "url is required"}, status_code=400)
+    try:
+        base = url.rstrip("/")
+        if base.endswith("/.well-known/agent-card.json"):
+            base = base[: -len("/.well-known/agent-card.json")].rstrip("/") or base
+        card = await fetch_a2a_agent_card(base)
+        if not card:
+            return JSONResponse({
+                "error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"
+            }, status_code=400)
+        agent = register_a2a_agent(base, card)
+        return JSONResponse(agent)
+    except Exception as exc:
+        logger.exception("Failed to register A2A agent from %s", url)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.delete("/api/agents/{agent_id:path}")
+async def api_agents_remove(agent_id: str):
+    """Remove a manually registered A2A agent."""
+    from agents.registry import remove_agent
+    if remove_agent(agent_id):
+        return JSONResponse({"status": "removed"})
+    return JSONResponse({"error": "Agent not found or is an MCP server (cannot remove)"}, status_code=404)
+
+
+@app.get("/api/agents/{agent_id:path}/history")
+async def api_agent_history(agent_id: str):
+    """Return status history for a specific agent."""
+    from agents.registry import get_agent_status_history
+    rows = get_agent_status_history(agent_id, limit=50)
+    return JSONResponse(rows)
+
+
+@app.get("/api/agents/telemetry/summary")
+async def api_telemetry_summary():
+    """Return aggregated telemetry data (token usage, costs, latency)."""
+    from agents.telemetry import get_telemetry_summary
+    return JSONResponse(get_telemetry_summary())
+
+
+@app.get("/api/agents/activity/recent")
+async def api_agents_activity_recent():
+    """Return recent agent activity events."""
+    from agents.activity_stream import get_recent_events
+    return JSONResponse(get_recent_events(limit=50))
+
+
+@app.get("/api/agents/activity/stream")
+async def api_agents_activity_stream():
+    """SSE endpoint for real-time agent activity (AOP-compatible)."""
+    import json
+    from agents.activity_stream import subscribe, unsubscribe
+
+    queue = subscribe()
+
+    async def event_generator():
+        try:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield f": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            unsubscribe(queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 if __name__ == "__main__":

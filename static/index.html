@@ -1218,6 +1218,143 @@ header .actions {
 .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
 .theme-toggle svg { width: 16px; height: 16px; }
 
+.beta-badge {
+  display: inline-block; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  padding: 1px 5px; border-radius: 3px; background: linear-gradient(135deg, var(--orange), var(--pink));
+  color: #fff; vertical-align: middle; margin-left: 2px; line-height: 1.4;
+}
+
+/* --- Agents Tab --- */
+.agents-header {
+  display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+}
+.agents-header-left { display: flex; flex-direction: column; gap: 4px; }
+.agents-subtitle { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.agents-subtitle code { background: var(--surface-hover); padding: 1px 5px; border-radius: 4px; font-size: 10px; }
+.agents-header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.agents-summary {
+  display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.agents-summary-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 100px;
+}
+.agents-summary-card .asc-val { font-size: 22px; font-weight: 700; font-family: var(--font-mono); }
+.agents-summary-card .asc-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.agents-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px;
+}
+.agent-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; transition: border-color 0.2s, box-shadow 0.2s; position: relative; overflow: hidden;
+}
+.agent-card:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-glow); }
+.agent-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.agent-icon {
+  width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.agent-icon.mcp { background: var(--accent-glow); color: var(--accent); }
+.agent-icon.a2a { background: rgba(29,209,161,0.12); color: var(--cyan); }
+.agent-card-name { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.agent-status-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.agent-status-dot.stopped { background: var(--red); }
+.agent-status-dot.error { background: var(--orange); }
+.agent-status-dot.unknown { background: var(--text-dim); }
+.agent-card-body { font-size: 12px; color: var(--text-muted); }
+.agent-card-row { display: flex; gap: 6px; align-items: baseline; margin-bottom: 4px; }
+.agent-card-row .acr-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; min-width: 58px; flex-shrink: 0; }
+.agent-card-row .acr-value { font-family: var(--font-mono); font-size: 11px; word-break: break-all; }
+.agent-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.3px;
+}
+.agent-badge.running { background: rgba(46,213,115,0.12); color: var(--green); }
+.agent-badge.stopped { background: rgba(255,71,87,0.12); color: var(--red); }
+.agent-badge.error { background: rgba(255,165,2,0.12); color: var(--orange); }
+.agent-badge.unknown { background: var(--surface-hover); color: var(--text-dim); }
+.agent-badge.mcp-badge { background: var(--accent-glow); color: var(--accent); }
+.agent-badge.a2a-badge { background: rgba(29,209,161,0.12); color: var(--cyan); }
+.agent-caps { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.agent-cap-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--surface-hover); color: var(--text-muted); font-family: var(--font-mono); }
+.agent-card-actions { display: flex; gap: 6px; margin-top: 10px; }
+.agent-card-actions button {
+  font-size: 10px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border);
+  background: var(--surface-hover); color: var(--text-muted); cursor: pointer; font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+.agent-card-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.agent-card-actions button.danger:hover { border-color: var(--red); color: var(--red); }
+.agents-register-dialog {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.agents-register-inner {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 24px; width: 480px; max-width: 90vw;
+}
+.agents-register-inner h4 { font-size: 15px; font-weight: 600; margin: 0; }
+.agents-register-inner input {
+  width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text); font-family: var(--font-mono); font-size: 13px;
+}
+.agents-register-inner input:focus { outline: none; border-color: var(--accent); }
+.agent-history-chart {
+  display: flex; gap: 1px; align-items: flex-end; height: 20px; margin-top: 8px;
+}
+.agent-history-bar { width: 4px; border-radius: 1px; min-height: 2px; }
+.agent-history-bar.running { background: var(--green); height: 100%; }
+.agent-history-bar.stopped { background: var(--red); height: 60%; }
+.agent-history-bar.error { background: var(--orange); height: 80%; }
+.agent-history-bar.unknown { background: var(--text-dim); height: 40%; }
+.agents-telemetry-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;
+}
+.agents-telem-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+}
+.agents-telem-card .atc-val { font-size: 20px; font-weight: 700; font-family: var(--font-mono); }
+.agents-telem-card .atc-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.agents-telem-card .atc-sub { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); margin-top: 4px; }
+.agents-daily-chart { display: flex; align-items: flex-end; gap: 3px; height: 60px; padding: 8px 0; }
+.agents-daily-bar {
+  flex: 1; min-width: 6px; max-width: 20px; border-radius: 3px 3px 0 0; background: var(--accent); transition: height 0.3s;
+  position: relative; cursor: default;
+}
+.agents-daily-bar:hover { opacity: 0.8; }
+.agents-recent-table { width: 100%; font-size: 11px; font-family: var(--font-mono); border-collapse: collapse; }
+.agents-recent-table th { text-align: left; font-size: 10px; color: var(--text-dim); padding: 6px 8px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.3px; }
+.agents-recent-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-subtle); }
+.agents-activity-container {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+}
+.agents-activity-list { max-height: 200px; overflow-y: auto; }
+.agents-activity-item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px; font-family: var(--font-mono); animation: agentEventFadeIn 0.3s ease-out;
+}
+@keyframes agentEventFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.agents-activity-item .aai-time { color: var(--text-dim); min-width: 60px; flex-shrink: 0; }
+.agents-activity-item .aai-agent { color: var(--accent); min-width: 80px; flex-shrink: 0; }
+.agents-activity-item .aai-type { min-width: 70px; flex-shrink: 0; }
+.agents-activity-item .aai-data { color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aai-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.aai-dot.operation { background: var(--accent); }
+.aai-dot.cognition { background: var(--cyan); }
+.aai-dot.session { background: var(--green); }
+.agents-stream-badge {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-dim);
+  font-family: var(--font-mono); padding: 2px 6px; border-radius: 4px; background: var(--surface-hover);
+}
+.agents-stream-badge .live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
 .app-footer {
   text-align: center;
   padding: 32px 0 12px;
@@ -2606,6 +2743,7 @@ header .actions {
     <button class="tab" data-tab="activity" onclick="switchTab('activity')">Activity <span class="count" id="countActivity">0</span></button>
     <button class="tab" data-tab="intelligence" onclick="switchTab('intelligence');loadIntelligence()">Intelligence <span class="count" id="countIntel">&#9679;</span></button>
     <button class="tab" data-tab="readiness" onclick="switchTab('readiness');loadReadinessHistory()">AI Readiness <span class="count" id="countReadiness">&#9679;</span></button>
+    <button class="tab" data-tab="agents" onclick="switchTab('agents');loadAgents()">Agents <span class="beta-badge">Beta</span> <span class="count" id="countAgents">&#9679;</span></button>
   </div>
 
   <div class="panel active" id="panel-my-prs">
@@ -2670,6 +2808,35 @@ header .actions {
     </div>
     <div class="readiness-result" id="readinessResult"></div>
     <div class="readiness-history" id="readinessHistory"></div>
+  </div>
+
+  <div class="panel" id="panel-agents">
+    <div class="agents-header">
+      <div class="agents-header-left">
+        <h3 style="margin:0;font-size:15px;font-weight:600">Agent Registry</h3>
+        <span class="agents-subtitle">MCP servers auto-discovered from <code>~/.cursor/mcp.json</code> &middot; A2A agents registered manually</span>
+      </div>
+      <div class="agents-header-actions">
+        <button class="readiness-scan-btn" onclick="refreshAgents()" id="agentsRefreshBtn">Refresh Status</button>
+        <button class="readiness-scan-btn" style="background:var(--cyan);color:#000" onclick="showRegisterAgentDialog()">+ Register A2A Agent</button>
+      </div>
+    </div>
+    <div class="agents-summary" id="agentsSummary"></div>
+    <div class="agents-telemetry" id="agentsTelemetry" style="margin-bottom:20px"></div>
+    <div class="agents-activity-feed" id="agentsActivityFeed" style="margin-bottom:20px"></div>
+    <div class="agents-grid" id="agentsGrid"></div>
+    <div class="agents-register-dialog" id="agentsRegisterDialog" style="display:none">
+      <div class="agents-register-inner">
+        <h4>Register External Agent (A2A Protocol)</h4>
+        <p style="color:var(--text-muted);font-size:12px;margin:8px 0 12px">Enter the base URL of an A2A-compatible agent. The system will fetch its Agent Card from <code>/.well-known/agent-card.json</code></p>
+        <input type="text" id="agentRegisterUrl" placeholder="https://agent.example.com" onkeydown="if(event.key==='Enter')registerA2AAgent()">
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="readiness-scan-btn" onclick="registerA2AAgent()">Register</button>
+          <button class="readiness-scan-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="hideRegisterAgentDialog()">Cancel</button>
+        </div>
+        <div id="agentRegisterStatus" style="margin-top:8px;font-size:12px;font-family:var(--font-mono)"></div>
+      </div>
+    </div>
   </div>
 
   <footer class="app-footer">Workstream &mdash; Open-source developer dashboard</footer>
@@ -3643,6 +3810,7 @@ document.addEventListener('keydown', (e) => {
     case '5': switchTab('activity'); e.preventDefault(); break;
     case '6': switchTab('intelligence'); loadIntelligence(); e.preventDefault(); break;
     case '7': switchTab('readiness'); loadReadinessHistory(); e.preventDefault(); break;
+    case '8': switchTab('agents'); loadAgents(); e.preventDefault(); break;
     case 'r':
       if (!e.metaKey && !e.ctrlKey) { refresh(); e.preventDefault(); }
       break;
@@ -4440,6 +4608,302 @@ async function loadReadinessHistory() {
   } catch (err) {
     container.innerHTML = '';
   }
+}
+
+// --- Agents Dashboard ---
+let _agentsData = [];
+let _agentsLoaded = false;
+
+async function loadAgents() {
+  if (_agentsLoaded && _agentsData.length) { renderAgents(_agentsData); loadTelemetry(); initAgentActivityFeed(); return; }
+  const grid = document.getElementById('agentsGrid');
+  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Loading agents...</div>';
+  try {
+    const resp = await fetch('/api/agents');
+    _agentsData = await resp.json();
+    _agentsLoaded = true;
+    renderAgents(_agentsData);
+    loadTelemetry();
+    initAgentActivityFeed();
+  } catch (e) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Failed to load agents</div>';
+  }
+}
+
+async function refreshAgents() {
+  const btn = document.getElementById('agentsRefreshBtn');
+  btn.disabled = true; btn.textContent = 'Checking...';
+  const grid = document.getElementById('agentsGrid');
+  try {
+    const resp = await fetch('/api/agents/refresh', { method: 'POST' });
+    _agentsData = await resp.json();
+    _agentsLoaded = true;
+    renderAgents(_agentsData);
+  } catch (e) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red)">Refresh failed</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Refresh Status';
+  }
+}
+
+function renderAgents(agents) {
+  const summary = document.getElementById('agentsSummary');
+  const grid = document.getElementById('agentsGrid');
+  const countEl = document.getElementById('countAgents');
+
+  const total = agents.length;
+  const running = agents.filter(a => a.status === 'running').length;
+  const stopped = agents.filter(a => a.status === 'stopped').length;
+  const errors = agents.filter(a => a.status === 'error').length;
+  const mcpCount = agents.filter(a => a.source === 'mcp').length;
+  const a2aCount = agents.filter(a => a.source === 'a2a').length;
+
+  if (countEl) countEl.textContent = total;
+
+  summary.innerHTML = `
+    <div class="agents-summary-card"><div class="asc-val">${total}</div><div class="asc-label">Total</div></div>
+    <div class="agents-summary-card"><div class="asc-val" style="color:var(--green)">${running}</div><div class="asc-label">Running</div></div>
+    <div class="agents-summary-card"><div class="asc-val" style="color:var(--red)">${stopped}</div><div class="asc-label">Stopped</div></div>
+    ${errors ? `<div class="agents-summary-card"><div class="asc-val" style="color:var(--orange)">${errors}</div><div class="asc-label">Errors</div></div>` : ''}
+    <div class="agents-summary-card"><div class="asc-val" style="color:var(--accent)">${mcpCount}</div><div class="asc-label">MCP</div></div>
+    ${a2aCount ? `<div class="agents-summary-card"><div class="asc-val" style="color:var(--cyan)">${a2aCount}</div><div class="asc-label">A2A</div></div>` : ''}
+  `;
+
+  if (!agents.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">No agents discovered. Check that <code>~/.cursor/mcp.json</code> exists.</div>';
+    return;
+  }
+
+  grid.innerHTML = agents.map(a => {
+    const icon = a.source === 'a2a' ? 'A2A' : 'MCP';
+    const iconClass = a.source === 'a2a' ? 'a2a' : 'mcp';
+    const srcBadge = a.source === 'a2a' ? 'a2a-badge' : 'mcp-badge';
+    const typeLbl = a.type === 'local' ? 'Local process' : 'Remote endpoint';
+
+    const meta = a.metadata || {};
+    let endpointDisplay = a.endpoint || '';
+    if (endpointDisplay.length > 60) endpointDisplay = endpointDisplay.slice(0, 57) + '...';
+
+    const desc = meta.description || '';
+    const caps = (a.capabilities || []).slice(0, 5);
+
+    const lastChecked = a.last_checked ? timeAgo(a.last_checked) : 'never';
+    const lastSeen = a.last_seen ? timeAgo(a.last_seen) : 'never';
+
+    let actions = `<button onclick="loadAgentHistory('${a.id}')">History</button>`;
+    if (a.source === 'a2a') {
+      actions += `<button class="danger" onclick="removeAgent('${a.id}')">Remove</button>`;
+    }
+
+    return `
+      <div class="agent-card">
+        <div class="agent-card-header">
+          <div class="agent-icon ${iconClass}">${icon}</div>
+          <span class="agent-card-name">${a.name}</span>
+          <span class="agent-badge ${srcBadge}">${a.source}</span>
+          <span class="agent-badge ${a.status}">${a.status}</span>
+          <span class="agent-status-dot ${a.status}"></span>
+        </div>
+        <div class="agent-card-body">
+          ${desc ? `<div class="agent-card-row"><span class="acr-value" style="color:var(--text)">${desc}</span></div>` : ''}
+          <div class="agent-card-row"><span class="acr-label">Type</span><span class="acr-value">${typeLbl}</span></div>
+          <div class="agent-card-row"><span class="acr-label">Endpoint</span><span class="acr-value">${endpointDisplay}</span></div>
+          <div class="agent-card-row"><span class="acr-label">Checked</span><span class="acr-value">${lastChecked}</span></div>
+          <div class="agent-card-row"><span class="acr-label">Last Up</span><span class="acr-value">${lastSeen}</span></div>
+          ${meta.auth ? `<div class="agent-card-row"><span class="acr-label">Auth</span><span class="acr-value">${meta.auth === '***' ? 'token' : meta.auth}</span></div>` : ''}
+          ${a.error ? `<div class="agent-card-row"><span class="acr-label" style="color:var(--red)">Error</span><span class="acr-value" style="color:var(--red)">${a.error}</span></div>` : ''}
+          ${caps.length ? `<div class="agent-caps">${caps.map(c => `<span class="agent-cap-tag">${c}</span>`).join('')}</div>` : ''}
+          <div id="agent-history-${CSS.escape(a.id)}" class="agent-history-chart"></div>
+        </div>
+        <div class="agent-card-actions">${actions}</div>
+      </div>`;
+  }).join('');
+}
+
+async function loadAgentHistory(agentId) {
+  const el = document.getElementById('agent-history-' + CSS.escape(agentId));
+  if (!el) return;
+  if (el.dataset.loaded) { el.innerHTML = ''; el.dataset.loaded = ''; return; }
+  try {
+    const resp = await fetch(`/api/agents/${encodeURIComponent(agentId)}/history`);
+    const rows = await resp.json();
+    if (!rows.length) { el.innerHTML = '<span style="font-size:10px;color:var(--text-dim)">No history yet</span>'; el.dataset.loaded = '1'; return; }
+    const bars = rows.slice(0, 40).reverse().map(r => `<div class="agent-history-bar ${r.status}" title="${r.checked_at}: ${r.status}"></div>`).join('');
+    el.innerHTML = bars;
+    el.dataset.loaded = '1';
+  } catch (e) { el.innerHTML = '<span style="font-size:10px;color:var(--red)">Failed</span>'; }
+}
+
+function showRegisterAgentDialog() {
+  document.getElementById('agentsRegisterDialog').style.display = 'flex';
+  document.getElementById('agentRegisterUrl').focus();
+}
+
+function hideRegisterAgentDialog() {
+  document.getElementById('agentsRegisterDialog').style.display = 'none';
+  document.getElementById('agentRegisterUrl').value = '';
+  document.getElementById('agentRegisterStatus').textContent = '';
+}
+
+async function registerA2AAgent() {
+  const url = document.getElementById('agentRegisterUrl').value.trim();
+  const status = document.getElementById('agentRegisterStatus');
+  if (!url) { status.textContent = 'URL is required'; status.style.color = 'var(--red)'; return; }
+  status.textContent = 'Fetching agent card...'; status.style.color = 'var(--text-muted)';
+  try {
+    const resp = await fetch('/api/agents/register', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({url}) });
+    const data = await resp.json();
+    if (data.error) { status.textContent = data.error; status.style.color = 'var(--red)'; return; }
+    status.textContent = `Registered: ${data.name}`; status.style.color = 'var(--green)';
+    _agentsLoaded = false;
+    setTimeout(() => { hideRegisterAgentDialog(); loadAgents(); }, 1000);
+  } catch (e) { status.textContent = 'Failed to register'; status.style.color = 'var(--red)'; }
+}
+
+async function removeAgent(agentId) {
+  if (!confirm('Remove this agent?')) return;
+  try {
+    await fetch(`/api/agents/${encodeURIComponent(agentId)}`, { method: 'DELETE' });
+    _agentsLoaded = false;
+    loadAgents();
+  } catch (e) { /* ignore */ }
+}
+
+// --- Live Activity Feed (AOP-compatible SSE) ---
+let _agentEventSource = null;
+let _agentActivityItems = [];
+
+function initAgentActivityFeed() {
+  const container = document.getElementById('agentsActivityFeed');
+  container.innerHTML = `
+    <details>
+      <summary style="cursor:pointer;font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);display:flex;align-items:center;gap:8px">
+        Live Activity Stream
+        <span class="agents-stream-badge" id="agentStreamBadge"><span class="live-dot"></span> connecting</span>
+      </summary>
+      <div class="agents-activity-container">
+        <div class="agents-activity-list" id="agentActivityList"></div>
+      </div>
+    </details>`;
+  loadRecentActivity();
+  connectAgentSSE();
+}
+
+async function loadRecentActivity() {
+  try {
+    const resp = await fetch('/api/agents/activity/recent');
+    const events = await resp.json();
+    _agentActivityItems = events;
+    renderActivityItems();
+  } catch (e) { /* ignore */ }
+}
+
+function connectAgentSSE() {
+  if (_agentEventSource) { _agentEventSource.close(); }
+  const badge = document.getElementById('agentStreamBadge');
+  _agentEventSource = new EventSource('/api/agents/activity/stream');
+  _agentEventSource.onopen = () => {
+    if (badge) badge.innerHTML = '<span class="live-dot"></span> live';
+  };
+  _agentEventSource.onmessage = (e) => {
+    try {
+      const evt = JSON.parse(e.data);
+      _agentActivityItems.push(evt);
+      if (_agentActivityItems.length > 50) _agentActivityItems = _agentActivityItems.slice(-50);
+      renderActivityItems();
+    } catch (err) { /* ignore parse errors */ }
+  };
+  _agentEventSource.onerror = () => {
+    if (badge) badge.innerHTML = '<span class="live-dot" style="background:var(--orange)"></span> reconnecting';
+  };
+}
+
+function renderActivityItems() {
+  const list = document.getElementById('agentActivityList');
+  if (!list) return;
+  const items = _agentActivityItems.slice().reverse();
+  if (!items.length) {
+    list.innerHTML = '<div style="text-align:center;padding:16px;font-size:11px;color:var(--text-dim)">Waiting for activity...</div>';
+    return;
+  }
+  list.innerHTML = items.map(ev => {
+    const t = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '';
+    const dataStr = ev.data ? Object.entries(ev.data).map(([k,v]) => `${k}=${v}`).join(' ') : '';
+    return `<div class="agents-activity-item">
+      <span class="aai-dot ${ev.category || 'operation'}"></span>
+      <span class="aai-time">${t}</span>
+      <span class="aai-agent">${ev.agent || ''}</span>
+      <span class="aai-type">${ev.type || ''}</span>
+      <span class="aai-data">${dataStr}</span>
+    </div>`;
+  }).join('');
+  list.scrollTop = 0;
+}
+
+async function loadTelemetry() {
+  const el = document.getElementById('agentsTelemetry');
+  try {
+    const resp = await fetch('/api/agents/telemetry/summary');
+    const data = await resp.json();
+    renderTelemetry(data, el);
+  } catch (e) { el.innerHTML = ''; }
+}
+
+function renderTelemetry(data, container) {
+  const t = data.totals || {};
+  const daily = (data.daily_stats || []).reverse();
+  const recent = data.recent_events || [];
+  const byAgent = data.by_agent || {};
+
+  if (!t.total_events) {
+    container.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center">
+        <div style="font-size:13px;color:var(--text-muted)">No telemetry data yet</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Usage data will appear here as you use AI Review, Intelligence, and Readiness features</div>
+      </div>`;
+    return;
+  }
+
+  const costDisplay = t.total_cost < 0.01 ? '<$0.01' : '$' + t.total_cost.toFixed(4);
+  const tokenK = t.total_tokens > 1000 ? (t.total_tokens / 1000).toFixed(1) + 'K' : t.total_tokens;
+
+  const maxOps = Math.max(...daily.map(d => d.ops), 1);
+  const dailyBars = daily.map(d => {
+    const h = Math.max(4, (d.ops / maxOps) * 56);
+    return `<div class="agents-daily-bar" style="height:${h}px" title="${d.day}: ${d.ops} ops, ${d.tokens || 0} tokens"></div>`;
+  }).join('');
+
+  const agentRows = Object.entries(byAgent).map(([name, s]) => `
+    <tr>
+      <td style="color:var(--accent)">${name}</td>
+      <td>${s.total_ops}</td>
+      <td>${s.total_tokens > 1000 ? (s.total_tokens/1000).toFixed(1)+'K' : s.total_tokens}</td>
+      <td>${s.total_cost < 0.01 ? '<$0.01' : '$'+s.total_cost.toFixed(4)}</td>
+      <td>${s.avg_latency_ms}ms</td>
+      <td><span style="color:var(--green)">${s.success_count}</span> / <span style="color:var(--red)">${s.error_count}</span></td>
+    </tr>
+  `).join('');
+
+  container.innerHTML = `
+    <details open>
+      <summary style="cursor:pointer;font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text)">Usage & Cost Tracking</summary>
+      <div class="agents-telemetry-grid">
+        <div class="agents-telem-card"><div class="atc-val">${t.total_events}</div><div class="atc-label">Total Operations</div></div>
+        <div class="agents-telem-card"><div class="atc-val">${tokenK}</div><div class="atc-label">Tokens Used</div></div>
+        <div class="agents-telem-card"><div class="atc-val">${costDisplay}</div><div class="atc-label">Est. Cost</div></div>
+        <div class="agents-telem-card"><div class="atc-val">${t.avg_latency_ms}ms</div><div class="atc-label">Avg Latency</div></div>
+      </div>
+      ${daily.length > 1 ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Daily activity (last ${daily.length} days)</div>
+        <div class="agents-daily-chart">${dailyBars}</div>
+      </div>` : ''}
+      ${agentRows ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;overflow-x:auto">
+        <table class="agents-recent-table">
+          <thead><tr><th>Agent</th><th>Ops</th><th>Tokens</th><th>Cost</th><th>Avg Latency</th><th>Ok / Err</th></tr></thead>
+          <tbody>${agentRows}</tbody>
+        </table>
+      </div>` : ''}
+    </details>`;
 }
 </script>
 
