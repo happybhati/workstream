@@ -9,6 +9,7 @@ google_token.json
 
 # --- Databases (contain personal data) ---
 *.db
+*.sqlite
 data.db
 workstream.db
 
