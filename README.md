@@ -2,7 +2,7 @@
 
 Your developer command center — PRs, tasks, calendar, and AI in one dashboard.
 
-Workstream is a developer productivity dashboard that runs locally as a Python [FastAPI](https://fastapi.tiangolo.com/) app. It aggregates GitHub PRs, GitLab MRs, Jira tasks, Google Calendar, weather, AI code review, intelligence collection (historical PR review analysis), and AI readiness scanning into a single-page dashboard with dark and light mode.
+Workstream is a developer productivity dashboard that runs locally as a Python [FastAPI](https://fastapi.tiangolo.com/) app. It aggregates GitHub PRs, GitLab MRs, Jira tasks, Google Calendar, weather, AI code review, intelligence collection (historical PR review analysis), AI readiness scanning, and an agents dashboard (MCP/A2A observability) into a single-page dashboard with dark and light mode.
 
 ## Screenshots
 
@@ -32,6 +32,16 @@ Workstream is a developer productivity dashboard that runs locally as a Python [
 
 ![AI Review modal](docs/screenshots/ai-review.png)
 
+**Agents Dashboard (Beta)** -- Monitor MCP servers auto-discovered from your Cursor config and manually registered A2A agents. Includes status tracking, usage and cost telemetry, and a live activity stream.
+
+![Agents Dashboard](docs/screenshots/agents-dashboard.png)
+
+<details>
+<summary>Agent cards and telemetry detail</summary>
+
+![Agent cards](docs/screenshots/agents-cards.png)
+</details>
+
 ## Feature highlights
 
 | Area | What you get |
@@ -46,6 +56,7 @@ Workstream is a developer productivity dashboard that runs locally as a Python [
 | **Focus banner** | Real-time summary of what needs attention |
 | **Widgets & habits** | Weather, live clock, stretch reminders, quick notes |
 | **UX** | Keyboard shortcuts, search/filter, dark/light mode |
+| **Agents dashboard** | Auto-discover MCP servers, register A2A agents, health checks, telemetry, live activity stream |
 | **MCP server** | Expose dashboard data and tools to AI assistants |
 
 ## Quick start
@@ -91,6 +102,7 @@ flowchart LR
   DB[(SQLite)]
   INT[intelligence/]
   RDY[agentic_readiness/]
+  AGT[agents/]
   MCP[mcp_server/]
 
   B <--> API
@@ -101,11 +113,13 @@ flowchart LR
   API <--> DB
   API --> INT
   API --> RDY
+  API --> AGT
+  AGT <--> DB
   INT --> MCP
   RDY --> MCP
 ```
 
-The browser loads the single-page UI from `static/index.html` and talks to **FastAPI** (`app.py`). **Pollers** refresh data from GitHub, GitLab, and Jira. State is stored in **SQLite** (`database.py`). **Intelligence** and **agentic readiness** modules power review analytics and repo scoring; the **MCP server** exposes tools for AI clients.
+The browser loads the single-page UI from `static/index.html` and talks to **FastAPI** (`app.py`). **Pollers** refresh data from GitHub, GitLab, and Jira. State is stored in **SQLite** (`database.py`). **Intelligence** and **agentic readiness** modules power review analytics and repo scoring. The **agents** module auto-discovers MCP servers and manages A2A agent registration, health checks, telemetry, and a live activity stream. The **MCP server** exposes tools for AI clients.
 
 ## Project structure
 
@@ -125,6 +139,10 @@ dashboard/
 │   ├── scanner.py
 │   ├── scorer.py
 │   └── generator.py
+├── agents/                # Agent observability (beta)
+│   ├── registry.py        # MCP discovery, A2A registration, health checks
+│   ├── telemetry.py       # Usage and cost tracking
+│   └── activity_stream.py # Real-time event bus (SSE)
 ├── mcp_server/            # MCP server for AI tools
 ├── bin/workstream          # CLI tool
 ├── install.sh             # macOS LaunchAgent installer
