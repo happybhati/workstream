@@ -26,9 +26,7 @@ logger = logging.getLogger("dashboard.intelligence.collector")
 
 DEFAULT_REPOS: list[str] = settings.intelligence_default_repos
 
-REPO_URL_RE = re.compile(
-    r"(?:https?://)?(?:www\.)?github\.com/(?P<owner>[^/]+)/(?P<repo>[^/\s#?]+)"
-)
+REPO_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?github\.com/(?P<owner>[^/]+)/(?P<repo>[^/\s#?]+)")
 
 
 def parse_repo_url(url: str) -> str:
@@ -97,9 +95,7 @@ async def _fetch_merged_prs(
             await _check_rate_limit(client)
             continue
         if resp.status_code != 200:
-            logger.error(
-                "Failed to fetch PRs for %s page %d: %s", repo, page, resp.status_code
-            )
+            logger.error("Failed to fetch PRs for %s page %d: %s", repo, page, resp.status_code)
             break
 
         items = resp.json()
@@ -163,9 +159,7 @@ async def _fetch_reviews(
             if body:
                 node_id = (
                     r.get("node_id", "")
-                    or hashlib.sha256(
-                        f"{repo}:{pr_number}:review:{r.get('id', '')}".encode()
-                    ).hexdigest()[:40]
+                    or hashlib.sha256(f"{repo}:{pr_number}:review:{r.get('id', '')}".encode()).hexdigest()[:40]
                 )
                 reviews.append(
                     {
@@ -214,9 +208,7 @@ async def _fetch_review_comments(
                 continue
             node_id = (
                 c.get("node_id", "")
-                or hashlib.sha256(
-                    f"{repo}:{pr_number}:{c.get('id', '')}".encode()
-                ).hexdigest()[:40]
+                or hashlib.sha256(f"{repo}:{pr_number}:{c.get('id', '')}".encode()).hexdigest()[:40]
             )
             comments.append(
                 {
@@ -291,15 +283,9 @@ async def collect_repo(
             await asyncio.sleep(0.3)
 
             if all_comments:
-                node_ids = [
-                    c.get("node_id", "") for c in all_comments if c.get("node_id")
-                ]
-                existing_ids = (
-                    await comment_node_ids_exist(node_ids) if node_ids else set()
-                )
-                new_comments = [
-                    c for c in all_comments if c.get("node_id", "") not in existing_ids
-                ]
+                node_ids = [c.get("node_id", "") for c in all_comments if c.get("node_id")]
+                existing_ids = await comment_node_ids_exist(node_ids) if node_ids else set()
+                new_comments = [c for c in all_comments if c.get("node_id", "") not in existing_ids]
                 inserted = await bulk_insert_ri_comments(new_comments)
                 stats["comments"] += inserted
                 stats["skipped"] += len(all_comments) - len(new_comments)
@@ -340,9 +326,7 @@ async def collect_all(
 
     for repo in target_repos:
         try:
-            stats = await collect_repo(
-                repo, since=since, progress_callback=progress_callback
-            )
+            stats = await collect_repo(repo, since=since, progress_callback=progress_callback)
             all_stats.append(stats)
         except Exception:
             logger.exception("Failed to collect reviews for %s", repo)

@@ -161,9 +161,7 @@ async def api_activity():
 
 @app.get("/api/jira-tasks")
 async def api_jira_tasks(role: str = "all", status: str = "all", sprint: str = "all"):
-    tasks = await get_jira_tasks(
-        role_filter=role, status_category=status, sprint=sprint
-    )
+    tasks = await get_jira_tasks(role_filter=role, status_category=status, sprint=sprint)
     return JSONResponse(tasks)
 
 
@@ -235,25 +233,15 @@ async def api_refresh():
 
 @app.get("/api/stats")
 async def api_stats():
-    all_my_prs = await get_my_prs(
-        settings.github_username, settings.gitlab_username, include_closed=True
-    )
-    assigned = await get_assigned_prs(
-        settings.github_username, settings.gitlab_username
-    )
-    reviews = await get_review_requests(
-        settings.github_username, settings.gitlab_username
-    )
+    all_my_prs = await get_my_prs(settings.github_username, settings.gitlab_username, include_closed=True)
+    assigned = await get_assigned_prs(settings.github_username, settings.gitlab_username)
+    reviews = await get_review_requests(settings.github_username, settings.gitlab_username)
     jira = await get_jira_stats()
 
     open_count = sum(1 for p in all_my_prs if p["state"] in ("open", "draft"))
     merged_count = sum(1 for p in all_my_prs if p["state"] == "merged")
     draft_count = sum(1 for p in all_my_prs if p["is_draft"] and p["state"] == "draft")
-    ci_failing = sum(
-        1
-        for p in all_my_prs
-        if p["ci_status"] == "failing" and p["state"] in ("open", "draft")
-    )
+    ci_failing = sum(1 for p in all_my_prs if p["ci_status"] == "failing" and p["state"] in ("open", "draft"))
 
     return JSONResponse(
         {
@@ -299,9 +287,7 @@ async def api_review(request: Request):
     pr_id = body.get("pr_id", "")
     provider = body.get("provider", "")
     if not pr_id or not provider:
-        return JSONResponse(
-            {"error": "pr_id and provider are required"}, status_code=400
-        )
+        return JSONResponse({"error": "pr_id and provider are required"}, status_code=400)
     try:
         result = await review_pr(pr_id, provider)
         return JSONResponse(result)
@@ -316,9 +302,7 @@ async def api_review_post(request: Request):
     pr_id = body.get("pr_id", "")
     comments = body.get("comments", [])
     if not pr_id or not comments:
-        return JSONResponse(
-            {"error": "pr_id and comments are required"}, status_code=400
-        )
+        return JSONResponse({"error": "pr_id and comments are required"}, status_code=400)
     try:
         result = await post_review(pr_id, comments)
         return JSONResponse(result)
@@ -355,16 +339,10 @@ async def api_readiness_scan(request: Request):
                 "owner": scan_result["owner"],
                 "repo": scan_result["repo"],
                 "score_total": score_result["total"],
-                "score_agent_config": score_result["categories"]["agent_config"][
-                    "score"
-                ],
-                "score_documentation": score_result["categories"]["documentation"][
-                    "score"
-                ],
+                "score_agent_config": score_result["categories"]["agent_config"]["score"],
+                "score_documentation": score_result["categories"]["documentation"]["score"],
                 "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
-                "score_code_structure": score_result["categories"]["code_structure"][
-                    "score"
-                ],
+                "score_code_structure": score_result["categories"]["code_structure"]["score"],
                 "score_security": score_result["categories"]["security"]["score"],
                 "grade": score_result["grade"],
                 "findings": json.dumps(score_result),
@@ -426,9 +404,7 @@ async def api_readiness_create_pr(request: Request):
     files = body.get("files", {})
     branch = body.get("branch", "add-ai-readiness-files")
     if not repo_url or not files:
-        return JSONResponse(
-            {"error": "repo_url and files are required"}, status_code=400
-        )
+        return JSONResponse({"error": "repo_url and files are required"}, status_code=400)
     try:
         owner, repo = parse_repo_url(repo_url)
         result = await create_draft_pr(owner, repo, files, branch_name=branch)
@@ -649,9 +625,7 @@ async def api_agents_register(request: Request):
         card = await fetch_a2a_agent_card(base)
         if not card:
             return JSONResponse(
-                {
-                    "error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"
-                },
+                {"error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"},
                 status_code=400,
             )
         agent = register_a2a_agent(base, card)

@@ -85,13 +85,9 @@ def _extract_existing_info(scan: dict) -> dict:
     if test_re.search(all_text):
         existing["has_test_commands"] = True
 
-    if re.search(
-        r"(?i)(convention|style\s+guide|coding\s+standard|code\s+style)", all_text
-    ):
+    if re.search(r"(?i)(convention|style\s+guide|coding\s+standard|code\s+style)", all_text):
         existing["has_conventions"] = True
-    if arch or re.search(
-        r"(?i)(architect|component|design\s+decision|system\s+design)", readme
-    ):
+    if arch or re.search(r"(?i)(architect|component|design\s+decision|system\s+design)", readme):
         existing["has_architecture_info"] = True
     if contrib:
         existing["has_contributing_info"] = True
@@ -473,9 +469,7 @@ def generate_codex_config(scan: dict) -> str:
     cmds = _infer_commands(scan)
 
     install = cmds["install"][0] if cmds["install"] else ""
-    verify = (
-        cmds["test"][0] if cmds["test"] else (cmds["build"][0] if cmds["build"] else "")
-    )
+    verify = cmds["test"][0] if cmds["test"] else (cmds["build"][0] if cmds["build"] else "")
 
     lines = [
         "# Codex configuration",
@@ -664,9 +658,7 @@ def generate_contributing_md(scan: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def generate_files(
-    scan: dict, score_result: dict | None = None, intelligence: dict | None = None
-) -> dict[str, str]:
+def generate_files(scan: dict, score_result: dict | None = None, intelligence: dict | None = None) -> dict[str, str]:
     """Return a dict of {filepath: content} for files that should be generated.
 
     Only produces files that are missing or insufficient. Existing, substantive

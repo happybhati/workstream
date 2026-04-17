@@ -358,9 +358,7 @@ def register_a2a_agent(base_url: str, card: dict) -> dict:
     name = card.get("name", base_url)
     agent_id = f"a2a:{name}"
     skills = card.get("skills", [])
-    capabilities = [
-        s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)
-    ]
+    capabilities = [s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)]
     info = {
         "id": agent_id,
         "name": name,
@@ -376,11 +374,7 @@ def register_a2a_agent(base_url: str, card: dict) -> dict:
             "description": card.get("description", ""),
             "version": card.get("version", ""),
             "provider": card.get("provider", {}),
-            "auth": (
-                card.get("auth", {}).get("type", "none")
-                if isinstance(card.get("auth"), dict)
-                else "none"
-            ),
+            "auth": (card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none"),
             "skills_count": len(skills),
             "input_modes": card.get("defaultInputModes", []),
             "output_modes": card.get("defaultOutputModes", []),
@@ -459,9 +453,7 @@ def _restore_registered_agents() -> None:
         agent_id = f"a2a:{name}"
         if agent_id not in _a2a_agents:
             skills = card.get("skills", [])
-            capabilities = [
-                s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)
-            ]
+            capabilities = [s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)]
             _a2a_agents[agent_id] = {
                 "id": agent_id,
                 "name": name,
@@ -478,9 +470,7 @@ def _restore_registered_agents() -> None:
                     "version": card.get("version", ""),
                     "provider": card.get("provider", {}),
                     "auth": (
-                        card.get("auth", {}).get("type", "none")
-                        if isinstance(card.get("auth"), dict)
-                        else "none"
+                        card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none"
                     ),
                     "skills_count": len(skills),
                     "input_modes": card.get("defaultInputModes", []),

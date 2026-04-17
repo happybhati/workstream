@@ -40,9 +40,7 @@ def test_default_paths_are_project_relative():
     import config
 
     project_dir = Path(config.__file__).resolve().parent
-    assert config.settings.db_path.parent == project_dir or "test" in str(
-        config.settings.db_path
-    )
+    assert config.settings.db_path.parent == project_dir or "test" in str(config.settings.db_path)
 
 
 def test_poll_interval_override(monkeypatch):

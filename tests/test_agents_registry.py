@@ -78,9 +78,7 @@ async def test_check_local_health_pgrep_not_found(registry_module):
     info = {
         "metadata": {"command": "npx", "args": ["@test/mcp-server"]},
     }
-    with patch(
-        "asyncio.create_subprocess_exec", side_effect=FileNotFoundError("pgrep")
-    ):
+    with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError("pgrep")):
         result = await registry_module.check_local_server_health(info)
     assert result == "unknown"
 

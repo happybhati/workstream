@@ -102,9 +102,7 @@ def _score_agent_config(scan: dict) -> dict:
 
     doc_dirs = scan.get("doc_dirs", [])
     if doc_dirs:
-        findings.append(
-            _finding(True, f"Structured docs/ directory ({', '.join(doc_dirs)})", 5)
-        )
+        findings.append(_finding(True, f"Structured docs/ directory ({', '.join(doc_dirs)})", 5))
         score += 5
     else:
         findings.append(_finding(False, "No docs/ directory", 0))
@@ -148,9 +146,7 @@ def _score_documentation(scan: dict) -> dict:
         if has_build_cmds:
             bonus = min(2, max(0, 8 - score))
             if bonus > 0:
-                findings.append(
-                    _finding(True, "README contains build/test commands", bonus)
-                )
+                findings.append(_finding(True, "README contains build/test commands", bonus))
                 score += bonus
     else:
         findings.append(_finding(False, "README.md missing", 0))
@@ -170,20 +166,12 @@ def _score_documentation(scan: dict) -> dict:
         findings.append(_finding(False, "CONTRIBUTING.md missing", 0))
 
     tree = scan.get("tree", [])
-    extra_docs = [
-        p for p in tree if p.lower().startswith("docs/") and p.endswith(".md")
-    ]
+    extra_docs = [p for p in tree if p.lower().startswith("docs/") and p.endswith(".md")]
     if len(extra_docs) >= 3:
-        findings.append(
-            _finding(
-                True, f"Additional docs ({len(extra_docs)} markdown files in docs/)", 5
-            )
-        )
+        findings.append(_finding(True, f"Additional docs ({len(extra_docs)} markdown files in docs/)", 5))
         score += 5
     elif extra_docs:
-        findings.append(
-            _finding(True, f"Some docs ({len(extra_docs)} file(s) in docs/)", 2)
-        )
+        findings.append(_finding(True, f"Some docs ({len(extra_docs)} file(s) in docs/)", 2))
         score += 2
     else:
         findings.append(_finding(False, "No additional documentation in docs/", 0))
@@ -202,18 +190,14 @@ def _score_ci_quality(scan: dict) -> dict:
 
     if scan.get("has_ci"):
         n = len(scan.get("ci_workflows", []))
-        findings.append(
-            _finding(True, f"GitHub Actions ({n} workflow{'s' if n != 1 else ''})", 8)
-        )
+        findings.append(_finding(True, f"GitHub Actions ({n} workflow{'s' if n != 1 else ''})", 8))
         score += 8
     else:
         findings.append(_finding(False, "No GitHub Actions workflows", 0))
 
     linters = scan.get("linter_files", [])
     if len(linters) >= 2:
-        findings.append(
-            _finding(True, f"Linter/formatter configs ({len(linters)} found)", 7)
-        )
+        findings.append(_finding(True, f"Linter/formatter configs ({len(linters)} found)", 7))
         score += 7
     elif linters:
         findings.append(_finding(True, f"Linter config ({linters[0]})", 4))
@@ -223,21 +207,13 @@ def _score_ci_quality(scan: dict) -> dict:
 
     test_dirs = scan.get("test_dirs", [])
     if test_dirs:
-        findings.append(
-            _finding(True, f"Test directories ({', '.join(test_dirs[:3])})", 5)
-        )
+        findings.append(_finding(True, f"Test directories ({', '.join(test_dirs[:3])})", 5))
         score += 5
     else:
         tree = scan.get("tree", [])
-        test_files = [
-            p
-            for p in tree
-            if "_test." in p or "test_" in p or ".spec." in p or ".test." in p
-        ]
+        test_files = [p for p in tree if "_test." in p or "test_" in p or ".spec." in p or ".test." in p]
         if test_files:
-            findings.append(
-                _finding(True, f"Test files found ({len(test_files)} files)", 3)
-            )
+            findings.append(_finding(True, f"Test files found ({len(test_files)} files)", 3))
             score += 3
         else:
             findings.append(_finding(False, "No test files found", 0))
@@ -267,14 +243,10 @@ def _score_code_structure(scan: dict) -> dict:
     nested_ratio = 1 - (len(root_files) / max(len(tree), 1))
 
     if len(dirs) >= 3 and nested_ratio > 0.5:
-        findings.append(
-            _finding(True, f"Well-organized layout ({len(dirs)} top-level dirs)", 6)
-        )
+        findings.append(_finding(True, f"Well-organized layout ({len(dirs)} top-level dirs)", 6))
         score += 6
     elif len(dirs) >= 2:
-        findings.append(
-            _finding(True, f"Basic directory structure ({len(dirs)} dirs)", 3)
-        )
+        findings.append(_finding(True, f"Basic directory structure ({len(dirs)} dirs)", 3))
         score += 3
     else:
         findings.append(_finding(False, "Flat or minimal directory structure", 0))
@@ -308,16 +280,10 @@ def _score_code_structure(scan: dict) -> dict:
 
     structured = scan.get("structured_dirs", [])
     if structured:
-        findings.append(
-            _finding(True, f"Separation of concerns ({', '.join(structured[:4])})", 3)
-        )
+        findings.append(_finding(True, f"Separation of concerns ({', '.join(structured[:4])})", 3))
         score += 3
     else:
-        findings.append(
-            _finding(
-                False, "No standard structural directories (src/, pkg/, lib/, etc.)", 0
-            )
-        )
+        findings.append(_finding(False, "No standard structural directories (src/, pkg/, lib/, etc.)", 0))
 
     return {"score": min(score, 20), "max": 20, "findings": findings}
 
@@ -333,9 +299,7 @@ def _score_security(scan: dict) -> dict:
 
     secrets_in_tree = scan.get("secrets_in_tree", [])
     if not secrets_in_tree:
-        findings.append(
-            _finding(True, "No secret files committed (.env, credentials, keys)", 5)
-        )
+        findings.append(_finding(True, "No secret files committed (.env, credentials, keys)", 5))
         score += 5
     else:
         findings.append(
@@ -350,9 +314,7 @@ def _score_security(scan: dict) -> dict:
         findings.append(_finding(True, ".gitignore covers secret patterns", 3))
         score += 3
     else:
-        findings.append(
-            _finding(False, ".gitignore does not cover common secret patterns", 0)
-        )
+        findings.append(_finding(False, ".gitignore does not cover common secret patterns", 0))
 
     if scan.get("has_dependabot") or scan.get("has_renovate"):
         tool = "Dependabot" if scan.get("has_dependabot") else "Renovate"
@@ -365,9 +327,7 @@ def _score_security(scan: dict) -> dict:
         findings.append(_finding(True, "No hardcoded tokens/keys detected", 5))
         score += 5
     else:
-        findings.append(
-            _finding(False, "Possible hardcoded tokens/keys detected in files", 0)
-        )
+        findings.append(_finding(False, "Possible hardcoded tokens/keys detected in files", 0))
 
     security_md = scan["key_files"].get("SECURITY.md", "")
     if security_md:

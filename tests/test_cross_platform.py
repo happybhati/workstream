@@ -94,6 +94,4 @@ def test_mcp_config_path_uses_home(registry_module, monkeypatch):
     from agents import registry
 
     default = Path.home() / ".cursor" / "mcp.json"
-    assert str(default) in str(registry.MCP_CONFIG_PATH) or "mcp.json" in str(
-        registry.MCP_CONFIG_PATH
-    )
+    assert str(default) in str(registry.MCP_CONFIG_PATH) or "mcp.json" in str(registry.MCP_CONFIG_PATH)

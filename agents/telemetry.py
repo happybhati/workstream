@@ -198,12 +198,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             "totals": {
                 "total_events": totals_row["total_events"] if totals_row else 0,
                 "total_tokens": totals_row["all_tokens"] or 0 if totals_row else 0,
-                "total_cost": (
-                    round(totals_row["all_cost"] or 0, 6) if totals_row else 0
-                ),
-                "avg_latency_ms": (
-                    round(totals_row["avg_latency"] or 0) if totals_row else 0
-                ),
+                "total_cost": (round(totals_row["all_cost"] or 0, 6) if totals_row else 0),
+                "avg_latency_ms": (round(totals_row["avg_latency"] or 0) if totals_row else 0),
             },
             "recent_events": recent,
             "daily_stats": daily,

@@ -259,12 +259,7 @@ def _get_team_context(pr_id: str) -> str:
         conn.row_factory = sqlite3.Row
 
         # Check if ri_patterns table exists (may not on first run)
-        tables = {
-            r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         if "ri_patterns" not in tables:
             conn.close()
             return ""
@@ -316,9 +311,7 @@ def _get_team_context(pr_id: str) -> str:
                 except Exception:
                     areas = []
                 if areas:
-                    lines.append(
-                        f"  - {r['reviewer']} focuses on: {', '.join(str(a) for a in areas[:3])}"
-                    )
+                    lines.append(f"  - {r['reviewer']} focuses on: {', '.join(str(a) for a in areas[:3])}")
         lines.append("--- END TEAM CONTEXT ---\n")
         return "\n".join(lines)
 

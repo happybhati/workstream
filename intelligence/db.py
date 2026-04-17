@@ -50,9 +50,7 @@ async def upsert_ri_pr(pr: dict) -> None:
 async def get_ri_pr(pr_id: str) -> dict | None:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM ri_pull_requests WHERE id = :id", {"id": pr_id}
-        )
+        cursor = await db.execute("SELECT * FROM ri_pull_requests WHERE id = :id", {"id": pr_id})
         row = await cursor.fetchone()
         return dict(row) if row else None
     finally:
@@ -74,9 +72,7 @@ async def get_ri_prs_by_repo(repo: str, limit: int = 100) -> list[dict]:
 async def count_ri_prs() -> dict:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo"
-        )
+        cursor = await db.execute("SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo")
         rows = await cursor.fetchall()
         result = {row["repo"]: row["cnt"] for row in rows}
         cursor = await db.execute("SELECT COUNT(*) as cnt FROM ri_pull_requests")
@@ -207,9 +203,7 @@ async def search_comments(query: str, repo: str = "", limit: int = 50) -> list[d
         await db.close()
 
 
-async def get_comments_by_file_path(
-    file_path_pattern: str, limit: int = 30
-) -> list[dict]:
+async def get_comments_by_file_path(file_path_pattern: str, limit: int = 30) -> list[dict]:
     db = await _get_db()
     try:
         cursor = await db.execute(
@@ -225,9 +219,7 @@ async def get_comments_by_file_path(
         await db.close()
 
 
-async def get_comments_by_category(
-    category: str, repo: str = "", limit: int = 50
-) -> list[dict]:
+async def get_comments_by_category(category: str, repo: str = "", limit: int = 50) -> list[dict]:
     db = await _get_db()
     try:
         repo_filter = "AND p.repo = :repo" if repo else ""
@@ -341,9 +333,7 @@ async def clear_ri_patterns() -> None:
         await db.close()
 
 
-async def get_patterns(
-    category: str = "", repo: str = "", limit: int = 50
-) -> list[dict]:
+async def get_patterns(category: str = "", repo: str = "", limit: int = 50) -> list[dict]:
     db = await _get_db()
     try:
         conditions = []
@@ -424,9 +414,7 @@ async def get_reviewer_profile(reviewer: str) -> dict | None:
 async def get_all_reviewer_profiles() -> list[dict]:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM ri_reviewer_profiles ORDER BY total_comments DESC"
-        )
+        cursor = await db.execute("SELECT * FROM ri_reviewer_profiles ORDER BY total_comments DESC")
         rows = await cursor.fetchall()
         result = []
         for row in rows:
@@ -467,10 +455,7 @@ async def get_ri_statistics() -> dict:
         "comments": comment_counts,
         "pattern_count": pattern_count,
         "reviewer_count": len(profiles),
-        "top_reviewers": [
-            {"reviewer": p["reviewer"], "comments": p["total_comments"]}
-            for p in profiles[:10]
-        ],
+        "top_reviewers": [{"reviewer": p["reviewer"], "comments": p["total_comments"]} for p in profiles[:10]],
     }
 
 
@@ -508,10 +493,7 @@ async def get_repo_intelligence(repo: str) -> dict:
                GROUP BY c.reviewer ORDER BY cnt DESC LIMIT 10""",
             {"repo": repo},
         )
-        reviewers = [
-            {"reviewer": r["reviewer"], "comments": r["cnt"]}
-            for r in await cursor.fetchall()
-        ]
+        reviewers = [{"reviewer": r["reviewer"], "comments": r["cnt"]} for r in await cursor.fetchall()]
 
         cursor = await db.execute(
             "SELECT * FROM ri_patterns WHERE repo = :repo ORDER BY frequency DESC LIMIT 20",
@@ -535,9 +517,7 @@ async def get_repo_intelligence(repo: str) -> dict:
             {"repo": repo},
         )
         row = await cursor.fetchone()
-        date_range = (
-            {"earliest": row["earliest"], "latest": row["latest"]} if row else {}
-        )
+        date_range = {"earliest": row["earliest"], "latest": row["latest"]} if row else {}
 
         return {
             "repo": repo,

@@ -207,43 +207,29 @@ async def init_db() -> None:
         cursor = await db.execute("PRAGMA table_info(yearly_completions)")
         cols = {row[1] for row in await cursor.fetchall()}
         if "same_period" not in cols:
-            await db.execute(
-                "ALTER TABLE yearly_completions ADD COLUMN same_period INTEGER NOT NULL DEFAULT 0"
-            )
+            await db.execute("ALTER TABLE yearly_completions ADD COLUMN same_period INTEGER NOT NULL DEFAULT 0")
         for table in ("pull_requests", "jira_issues"):
             cursor = await db.execute(f"PRAGMA table_info({table})")
             cols = {row[1] for row in await cursor.fetchall()}
             if "polled_at" not in cols:
-                await db.execute(
-                    f"ALTER TABLE {table} ADD COLUMN polled_at TEXT DEFAULT ''"
-                )
+                await db.execute(f"ALTER TABLE {table} ADD COLUMN polled_at TEXT DEFAULT ''")
         cursor = await db.execute("PRAGMA table_info(pull_requests)")
         pr_cols = {row[1] for row in await cursor.fetchall()}
         if "ci_checks" not in pr_cols:
-            await db.execute(
-                "ALTER TABLE pull_requests ADD COLUMN ci_checks TEXT DEFAULT ''"
-            )
+            await db.execute("ALTER TABLE pull_requests ADD COLUMN ci_checks TEXT DEFAULT ''")
         if "author_avatar" not in pr_cols:
-            await db.execute(
-                "ALTER TABLE pull_requests ADD COLUMN author_avatar TEXT DEFAULT ''"
-            )
+            await db.execute("ALTER TABLE pull_requests ADD COLUMN author_avatar TEXT DEFAULT ''")
         # node_id for comment deduplication
         cursor = await db.execute("PRAGMA table_info(ri_review_comments)")
         ri_cols = {row[1] for row in await cursor.fetchall()}
         if "node_id" not in ri_cols:
-            await db.execute(
-                "ALTER TABLE ri_review_comments ADD COLUMN node_id TEXT DEFAULT ''"
-            )
-            await db.execute(
-                "CREATE INDEX IF NOT EXISTS idx_ri_comment_node_id ON ri_review_comments(node_id)"
-            )
+            await db.execute("ALTER TABLE ri_review_comments ADD COLUMN node_id TEXT DEFAULT ''")
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_ri_comment_node_id ON ri_review_comments(node_id)")
         # score_security column for readiness scans
         cursor = await db.execute("PRAGMA table_info(readiness_scans)")
         rs_cols = {row[1] for row in await cursor.fetchall()}
         if "score_security" not in rs_cols:
-            await db.execute(
-                "ALTER TABLE readiness_scans ADD COLUMN score_security INTEGER DEFAULT 0"
-            )
+            await db.execute("ALTER TABLE readiness_scans ADD COLUMN score_security INTEGER DEFAULT 0")
         await db.commit()
     finally:
         await db.close()
@@ -307,9 +293,7 @@ async def insert_activity(activity: dict) -> None:
         await db.close()
 
 
-async def get_my_prs(
-    username_github: str, username_gitlab: str, include_closed: bool = False
-) -> list[dict]:
+async def get_my_prs(username_github: str, username_gitlab: str, include_closed: bool = False) -> list[dict]:
     db = await get_db()
     try:
         state_filter = "" if include_closed else "AND state IN ('open', 'draft')"
@@ -396,9 +380,7 @@ async def upsert_jira_issue(issue: dict) -> None:
         await db.close()
 
 
-async def get_jira_tasks(
-    role_filter: str = "all", status_category: str = "all", sprint: str = "all"
-) -> list[dict]:
+async def get_jira_tasks(role_filter: str = "all", status_category: str = "all", sprint: str = "all") -> list[dict]:
     db = await get_db()
     try:
         conditions = []
@@ -434,21 +416,15 @@ async def get_jira_stats() -> dict:
     try:
         result: dict = {"by_status": {}, "by_role": {}, "total": 0}
 
-        cursor = await db.execute(
-            "SELECT status_category, COUNT(*) as cnt FROM jira_issues GROUP BY status_category"
-        )
+        cursor = await db.execute("SELECT status_category, COUNT(*) as cnt FROM jira_issues GROUP BY status_category")
         for row in await cursor.fetchall():
             result["by_status"][row["status_category"]] = row["cnt"]
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('assignee', 'both')"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('assignee', 'both')")
         row = await cursor.fetchone()
         result["by_role"]["assignee"] = row["cnt"] if row else 0
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('reporter', 'both')"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('reporter', 'both')")
         row = await cursor.fetchone()
         result["by_role"]["reporter"] = row["cnt"] if row else 0
 
@@ -456,9 +432,7 @@ async def get_jira_stats() -> dict:
         row = await cursor.fetchone()
         result["total"] = row["cnt"] if row else 0
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE sprint_state = 'active'"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE sprint_state = 'active'")
         row = await cursor.fetchone()
         result["in_sprint"] = row["cnt"] if row else 0
 
@@ -467,9 +441,7 @@ async def get_jira_stats() -> dict:
         await db.close()
 
 
-async def upsert_yearly_completion(
-    year: int, completed: int, same_period: int = 0
-) -> None:
+async def upsert_yearly_completion(year: int, completed: int, same_period: int = 0) -> None:
     from datetime import datetime, timezone
 
     db = await get_db()
@@ -529,9 +501,7 @@ async def upsert_active_sprint(sprint: dict) -> None:
 async def get_active_sprints() -> list[dict]:
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM active_sprints WHERE state = 'active' ORDER BY project"
-        )
+        cursor = await db.execute("SELECT * FROM active_sprints WHERE state = 'active' ORDER BY project")
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -646,12 +616,8 @@ async def get_events_for_date(target_date=None) -> list[dict]:
 
     if target_date is None:
         target_date = datetime.now().date()
-    day_start = datetime(
-        target_date.year, target_date.month, target_date.day, 0, 0, 0
-    ).isoformat()
-    day_end = datetime(
-        target_date.year, target_date.month, target_date.day, 23, 59, 59
-    ).isoformat()
+    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0).isoformat()
+    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59).isoformat()
 
     db = await get_db()
     try:

@@ -45,9 +45,7 @@ async def poll_github() -> None:
         "X-GitHub-Api-Version": "2022-11-28",
     }
 
-    async with httpx.AsyncClient(
-        base_url="https://api.github.com", headers=headers, timeout=30
-    ) as client:
+    async with httpx.AsyncClient(base_url="https://api.github.com", headers=headers, timeout=30) as client:
         await _poll_github_authored(client)
         await _poll_github_recently_merged(client)
         await _poll_github_assigned(client)
@@ -76,9 +74,7 @@ async def _poll_github_authored(client: httpx.AsyncClient) -> None:
 
         reviewers = ",".join(r["login"] for r in pr_data.get("requested_reviewers", []))
 
-        ci_info = await _get_github_checks(
-            client, repo_full, pr_data.get("head", {}).get("sha", "")
-        )
+        ci_info = await _get_github_checks(client, repo_full, pr_data.get("head", {}).get("sha", ""))
 
         review_info = {"review_state": "", "approved_by": ""}
         if pr_detail.status_code == 200:
@@ -163,14 +159,10 @@ async def _poll_github_assigned(client: httpx.AsyncClient) -> None:
         pr_detail = await client.get(f"/repos/{repo_full}/pulls/{pr_number}")
         pr_data = pr_detail.json() if pr_detail.status_code == 200 else {}
 
-        assignees = ",".join(
-            a["login"] for a in pr_data.get("assignees", item.get("assignees", []))
-        )
+        assignees = ",".join(a["login"] for a in pr_data.get("assignees", item.get("assignees", [])))
         reviewers = ",".join(r["login"] for r in pr_data.get("requested_reviewers", []))
 
-        ci_info = await _get_github_checks(
-            client, repo_full, pr_data.get("head", {}).get("sha", "")
-        )
+        ci_info = await _get_github_checks(client, repo_full, pr_data.get("head", {}).get("sha", ""))
 
         review_info = {"review_state": "", "approved_by": ""}
         if pr_detail.status_code == 200:
@@ -225,9 +217,7 @@ async def _poll_github_review_requests(client: httpx.AsyncClient) -> None:
 
         reviewers = ",".join(r["login"] for r in pr_data.get("requested_reviewers", []))
 
-        ci_info = await _get_github_checks(
-            client, repo_full, pr_data.get("head", {}).get("sha", "")
-        )
+        ci_info = await _get_github_checks(client, repo_full, pr_data.get("head", {}).get("sha", ""))
 
         review_info = {"review_state": "", "approved_by": ""}
         if pr_detail.status_code == 200:
@@ -314,9 +304,7 @@ async def _get_github_checks(client: httpx.AsyncClient, repo: str, sha: str) -> 
     return result
 
 
-async def _poll_github_pr_events(
-    client: httpx.AsyncClient, repo: str, pr_number: int
-) -> dict:
+async def _poll_github_pr_events(client: httpx.AsyncClient, repo: str, pr_number: int) -> dict:
     """Fetch reviews, store as activities, and return review summary."""
     result = {"review_state": "", "approved_by": ""}
     resp = await client.get(f"/repos/{repo}/pulls/{pr_number}/reviews")
@@ -348,9 +336,7 @@ async def _poll_github_pr_events(
         )
 
     approvers = [u for u, s in latest_by_user.items() if s == "APPROVED"]
-    has_changes_requested = any(
-        s == "CHANGES_REQUESTED" for s in latest_by_user.values()
-    )
+    has_changes_requested = any(s == "CHANGES_REQUESTED" for s in latest_by_user.values())
 
     if has_changes_requested:
         result["review_state"] = "changes_requested"
@@ -382,14 +368,10 @@ async def poll_gitlab() -> None:
         await _poll_gitlab_review_requests(client, api)
 
 
-async def _get_gitlab_approval_state(
-    client: httpx.AsyncClient, api: str, project_id: int, mr_iid: int
-) -> dict:
+async def _get_gitlab_approval_state(client: httpx.AsyncClient, api: str, project_id: int, mr_iid: int) -> dict:
     """Fetch MR approval info from GitLab."""
     result = {"review_state": "", "approved_by": ""}
-    resp = await client.get(
-        f"{api}/projects/{project_id}/merge_requests/{mr_iid}/approvals"
-    )
+    resp = await client.get(f"{api}/projects/{project_id}/merge_requests/{mr_iid}/approvals")
     if resp.status_code != 200:
         return result
     data = resp.json()
@@ -400,9 +382,7 @@ async def _get_gitlab_approval_state(
     return result
 
 
-async def _get_gitlab_checks(
-    client: httpx.AsyncClient, api: str, project_id: int, pipeline: dict
-) -> dict:
+async def _get_gitlab_checks(client: httpx.AsyncClient, api: str, project_id: int, pipeline: dict) -> dict:
     """Return {"ci_status": str, "ci_checks": str(JSON)} from GitLab pipeline jobs."""
     import json as _json
 
@@ -419,9 +399,7 @@ async def _get_gitlab_checks(
     if not pid:
         return result
 
-    resp = await client.get(
-        f"{api}/projects/{project_id}/pipelines/{pid}/jobs", params={"per_page": 100}
-    )
+    resp = await client.get(f"{api}/projects/{project_id}/pipelines/{pid}/jobs", params={"per_page": 100})
     if resp.status_code != 200:
         return result
 
@@ -466,9 +444,7 @@ async def _poll_gitlab_authored(client: httpx.AsyncClient, api: str) -> None:
         pipeline = mr.get("head_pipeline") or {}
         ci_info = await _get_gitlab_checks(client, api, mr["project_id"], pipeline)
 
-        approval = await _get_gitlab_approval_state(
-            client, api, mr["project_id"], mr["iid"]
-        )
+        approval = await _get_gitlab_approval_state(client, api, mr["project_id"], mr["iid"])
 
         await upsert_pr(
             {
@@ -486,11 +462,7 @@ async def _poll_gitlab_authored(client: httpx.AsyncClient, api: str) -> None:
                 "ci_status": ci_info["ci_status"],
                 "review_requested_from": reviewers,
                 "jira_key": _extract_jira_key(mr["title"]),
-                "additions": (
-                    mr.get("changes_count", 0)
-                    if isinstance(mr.get("changes_count"), int)
-                    else 0
-                ),
+                "additions": (mr.get("changes_count", 0) if isinstance(mr.get("changes_count"), int) else 0),
                 "deletions": 0,
                 "comments_count": mr.get("user_notes_count", 0),
                 "review_state": approval["review_state"],
@@ -505,9 +477,7 @@ async def _poll_gitlab_recently_merged(client: httpx.AsyncClient, api: str) -> N
     """Fetch MRs merged in the last 30 days."""
     from datetime import timedelta
 
-    since = (datetime.now(timezone.utc) - timedelta(days=30)).strftime(
-        "%Y-%m-%dT00:00:00Z"
-    )
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%dT00:00:00Z")
     resp = await client.get(
         f"{api}/merge_requests",
         params={
@@ -565,9 +535,7 @@ async def _poll_gitlab_assigned(client: httpx.AsyncClient, api: str) -> None:
         pipeline = mr.get("head_pipeline") or {}
         ci_info = await _get_gitlab_checks(client, api, mr["project_id"], pipeline)
 
-        approval = await _get_gitlab_approval_state(
-            client, api, mr["project_id"], mr["iid"]
-        )
+        approval = await _get_gitlab_approval_state(client, api, mr["project_id"], mr["iid"])
 
         await upsert_pr(
             {
@@ -586,11 +554,7 @@ async def _poll_gitlab_assigned(client: httpx.AsyncClient, api: str) -> None:
                 "review_requested_from": reviewers,
                 "assigned_to": assignees,
                 "jira_key": _extract_jira_key(mr["title"]),
-                "additions": (
-                    mr.get("changes_count", 0)
-                    if isinstance(mr.get("changes_count"), int)
-                    else 0
-                ),
+                "additions": (mr.get("changes_count", 0) if isinstance(mr.get("changes_count"), int) else 0),
                 "deletions": 0,
                 "comments_count": mr.get("user_notes_count", 0),
                 "review_state": approval["review_state"],
@@ -622,9 +586,7 @@ async def _poll_gitlab_review_requests(client: httpx.AsyncClient, api: str) -> N
         pipeline = mr.get("head_pipeline") or {}
         ci_info = await _get_gitlab_checks(client, api, mr["project_id"], pipeline)
 
-        approval = await _get_gitlab_approval_state(
-            client, api, mr["project_id"], mr["iid"]
-        )
+        approval = await _get_gitlab_approval_state(client, api, mr["project_id"], mr["iid"])
 
         await upsert_pr(
             {
@@ -642,11 +604,7 @@ async def _poll_gitlab_review_requests(client: httpx.AsyncClient, api: str) -> N
                 "ci_status": ci_info["ci_status"],
                 "review_requested_from": reviewers,
                 "jira_key": _extract_jira_key(mr["title"]),
-                "additions": (
-                    mr.get("changes_count", 0)
-                    if isinstance(mr.get("changes_count"), int)
-                    else 0
-                ),
+                "additions": (mr.get("changes_count", 0) if isinstance(mr.get("changes_count"), int) else 0),
                 "deletions": 0,
                 "comments_count": mr.get("user_notes_count", 0),
                 "review_state": approval["review_state"],
@@ -701,11 +659,7 @@ def _parse_sprint(fields: dict) -> tuple[str, str]:
 
 
 async def poll_jira_issues() -> None:
-    if (
-        not settings.jira_url
-        or not settings.jira_api_token
-        or not settings.jira_projects
-    ):
+    if not settings.jira_url or not settings.jira_api_token or not settings.jira_projects:
         logger.warning("Jira issue polling not configured, skipping")
         return
 
@@ -716,15 +670,21 @@ async def poll_jira_issues() -> None:
 
     async with httpx.AsyncClient(auth=auth, timeout=30) as client:
         # Query 1: assigned to current user
-        jql_assigned = f"project IN ({projects}) AND assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+        jql_assigned = (
+            f"project IN ({projects}) AND assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+        )
         await _fetch_jira_issues(client, base, jql_assigned, fields, "assignee")
 
         # Query 2: reported by current user
-        jql_reporter = f"project IN ({projects}) AND reporter = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+        jql_reporter = (
+            f"project IN ({projects}) AND reporter = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+        )
         await _fetch_jira_issues(client, base, jql_reporter, fields, "reporter")
 
         # Query 3: release pending assigned to current user
-        jql_release_pending = f'project IN ({projects}) AND assignee = currentUser() AND status = "Release Pending" ORDER BY updated DESC'
+        jql_release_pending = (
+            f'project IN ({projects}) AND assignee = currentUser() AND status = "Release Pending" ORDER BY updated DESC'
+        )
         await _fetch_jira_issues(client, base, jql_release_pending, fields, "assignee")
 
         # Query 4: recently done (last 7 days) for the done tab
@@ -736,9 +696,7 @@ async def poll_jira_issues() -> None:
         await _fetch_jira_issues(client, base, jql_done, fields, "")
 
 
-async def _fetch_jira_issues(
-    client: httpx.AsyncClient, base: str, jql: str, fields: str, role: str
-) -> None:
+async def _fetch_jira_issues(client: httpx.AsyncClient, base: str, jql: str, fields: str, role: str) -> None:
     start_at = 0
     while True:
         resp = await client.get(
@@ -751,9 +709,7 @@ async def _fetch_jira_issues(
             },
         )
         if resp.status_code != 200:
-            logger.error(
-                "Jira search failed (%s): %s", resp.status_code, resp.text[:300]
-            )
+            logger.error("Jira search failed (%s): %s", resp.status_code, resp.text[:300])
             return
 
         data = resp.json()
@@ -772,21 +728,12 @@ async def _fetch_jira_issues(
             issue_role = role
             if not issue_role:
                 acct = settings.jira_account_name.lower()
-                email_prefix = (
-                    settings.jira_email.split("@")[0].lower()
-                    if settings.jira_email
-                    else acct
-                )
+                email_prefix = settings.jira_email.split("@")[0].lower() if settings.jira_email else acct
 
                 def _user_matches(user_obj: dict) -> bool:
                     name = user_obj.get("displayName", "").lower()
                     email = user_obj.get("emailAddress", "").lower()
-                    return (
-                        acct in email
-                        or email_prefix in email
-                        or acct in name
-                        or email_prefix in name
-                    )
+                    return acct in email or email_prefix in email or acct in name or email_prefix in name
 
                 is_assignee = _user_matches(assignee_obj)
                 is_reporter = _user_matches(reporter_obj)
@@ -855,11 +802,7 @@ async def _count_jira_issues(client, base, jql) -> int:
 
 
 async def poll_yearly_completions() -> None:
-    if (
-        not settings.jira_url
-        or not settings.jira_api_token
-        or not settings.jira_projects
-    ):
+    if not settings.jira_url or not settings.jira_api_token or not settings.jira_projects:
         return
 
     projects = ", ".join(settings.jira_projects)
@@ -896,9 +839,7 @@ async def poll_yearly_completions() -> None:
         )
         last_same_period = await _count_jira_issues(client, base, jql_last_same)
 
-        await upsert_yearly_completion(
-            last_year, last_full, same_period=last_same_period
-        )
+        await upsert_yearly_completion(last_year, last_full, same_period=last_same_period)
         logger.info(
             "Jira completions %d: %d full, %d by same date",
             last_year,
@@ -913,11 +854,7 @@ async def poll_yearly_completions() -> None:
 
 
 async def poll_active_sprints() -> None:
-    if (
-        not settings.jira_url
-        or not settings.jira_api_token
-        or not settings.jira_projects
-    ):
+    if not settings.jira_url or not settings.jira_api_token or not settings.jira_projects:
         return
 
     auth = httpx.BasicAuth(settings.jira_email, settings.jira_api_token)
@@ -931,9 +868,7 @@ async def poll_active_sprints() -> None:
                     params={"projectKeyOrId": project, "type": "scrum"},
                 )
                 if board_resp.status_code != 200:
-                    logger.debug(
-                        "No scrum board for %s: %s", project, board_resp.status_code
-                    )
+                    logger.debug("No scrum board for %s: %s", project, board_resp.status_code)
                     continue
 
                 boards = board_resp.json().get("values", [])
@@ -999,9 +934,7 @@ async def enrich_jira() -> None:
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
     try:
-        cursor = await db.execute(
-            "SELECT DISTINCT jira_key FROM pull_requests WHERE jira_key != ''"
-        )
+        cursor = await db.execute("SELECT DISTINCT jira_key FROM pull_requests WHERE jira_key != ''")
         keys = [row["jira_key"] for row in await cursor.fetchall()]
     finally:
         await db.close()
@@ -1084,9 +1017,7 @@ async def poll_google_calendar() -> None:
     now = datetime.now(timezone.utc)
     local_now = datetime.now()
     day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
-    tomorrow_end = (day_start + timedelta(days=1)).replace(
-        hour=23, minute=59, second=59
-    )
+    tomorrow_end = (day_start + timedelta(days=1)).replace(hour=23, minute=59, second=59)
 
     time_min = day_start.astimezone(timezone.utc).isoformat()
     time_max = tomorrow_end.astimezone(timezone.utc).isoformat()
@@ -1132,9 +1063,7 @@ async def poll_google_calendar() -> None:
                 break
 
         attendees = event.get("attendees", [])
-        attendee_count = len(
-            [a for a in attendees if a.get("responseStatus") != "declined"]
-        )
+        attendee_count = len([a for a in attendees if a.get("responseStatus") != "declined"])
 
         await upsert_calendar_event(
             {

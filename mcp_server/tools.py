@@ -59,9 +59,7 @@ def get_repo_context(repo: str) -> dict:
     db = _get_db()
     try:
         # PR stats from review intelligence
-        row = db.execute(
-            "SELECT COUNT(*) as cnt FROM ri_pull_requests WHERE repo = ?", (repo,)
-        ).fetchone()
+        row = db.execute("SELECT COUNT(*) as cnt FROM ri_pull_requests WHERE repo = ?", (repo,)).fetchone()
         pr_count = row["cnt"] if row else 0
 
         row = db.execute(
@@ -78,9 +76,7 @@ def get_repo_context(repo: str) -> dict:
             "GROUP BY c.reviewer ORDER BY cnt DESC LIMIT 5",
             (repo,),
         ).fetchall()
-        top_reviewers = [
-            {"reviewer": r["reviewer"], "comments": r["cnt"]} for r in rows
-        ]
+        top_reviewers = [{"reviewer": r["reviewer"], "comments": r["cnt"]} for r in rows]
 
         # Category distribution
         rows = db.execute(
@@ -164,9 +160,7 @@ def get_reviewer_profile(reviewer: str) -> dict:
     """Get detailed profile for a specific reviewer."""
     db = _get_db()
     try:
-        row = db.execute(
-            "SELECT * FROM ri_reviewer_profiles WHERE reviewer = ?", (reviewer,)
-        ).fetchone()
+        row = db.execute("SELECT * FROM ri_reviewer_profiles WHERE reviewer = ?", (reviewer,)).fetchone()
         if not row:
             return {"error": f"No profile found for reviewer: {reviewer}"}
         d = dict(row)
@@ -365,9 +359,7 @@ def generate_contextual_review_prompt(pr_id: str) -> dict:
     finally:
         db.close()
 
-    context_block = _build_context_block(
-        repo, repo_patterns, reviewer_context, focus_areas
-    )
+    context_block = _build_context_block(repo, repo_patterns, reviewer_context, focus_areas)
 
     return {
         "pr_id": pr_id,
@@ -418,9 +410,7 @@ def get_review_statistics() -> dict:
     db = _get_db()
     try:
         # PR counts by repo
-        rows = db.execute(
-            "SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo"
-        ).fetchall()
+        rows = db.execute("SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo").fetchall()
         prs_by_repo = {r["repo"]: r["cnt"] for r in rows}
 
         total_prs = sum(prs_by_repo.values())
@@ -448,9 +438,7 @@ def get_review_statistics() -> dict:
         rows = db.execute(
             "SELECT reviewer, total_comments FROM ri_reviewer_profiles ORDER BY total_comments DESC LIMIT 10"
         ).fetchall()
-        top_reviewers = [
-            {"reviewer": r["reviewer"], "comments": r["total_comments"]} for r in rows
-        ]
+        top_reviewers = [{"reviewer": r["reviewer"], "comments": r["total_comments"]} for r in rows]
 
         return {
             "total_prs_analyzed": total_prs,

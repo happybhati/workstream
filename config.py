@@ -57,9 +57,7 @@ class Settings(BaseSettings):
             str(_PROJECT_DIR / "google_token.json"),
         )
     )
-    google_calendar_ids: list[str] = os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(
-        ","
-    )
+    google_calendar_ids: list[str] = os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",")
 
     # --- AI Review Providers (all optional) ---
     ai_ollama_url: str = os.getenv("AI_OLLAMA_URL", "http://localhost:11434")
