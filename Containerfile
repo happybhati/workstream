@@ -5,7 +5,7 @@
 FROM registry.fedoraproject.org/fedora:41 AS base
 
 RUN dnf install -y --setopt=install_weak_deps=False \
-        python3.12 python3.12-pip git procps-ng curl && \
+        python3 python3-pip git procps-ng curl && \
     dnf clean all && \
     rm -rf /var/cache/dnf
 
@@ -14,7 +14,7 @@ RUN useradd -r -m -s /sbin/nologin workstream
 WORKDIR /app
 
 COPY requirements.txt .
-RUN python3.12 -m pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 RUN chown -R workstream:workstream /app
@@ -26,4 +26,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
-ENTRYPOINT ["python3.12", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -45,9 +45,9 @@ spec:
               image: registry.fedoraproject.org/fedora:41
               script: |
                 cd $(workspaces.source.path)
-                dnf install -y python3.12 python3.12-pip
-                python3.12 -m pip install -r requirements.txt
-                python3.12 -m py_compile app.py config.py database.py
+                dnf install -y python3 python3-pip
+                python3 -m pip install -r requirements.txt
+                python3 -m py_compile app.py config.py database.py
                 echo "Build verification passed"
           workspaces:
             - name: source
@@ -63,9 +63,9 @@ spec:
               image: registry.fedoraproject.org/fedora:41
               script: |
                 cd $(workspaces.source.path)
-                dnf install -y python3.12 python3.12-pip
-                python3.12 -m pip install -r requirements.txt -r requirements-dev.txt
-                python3.12 -m pytest --tb=short -q
+                dnf install -y python3 python3-pip
+                python3 -m pip install -r requirements.txt -r requirements-dev.txt
+                python3 -m pytest --tb=short -q
                 echo "Tests passed"
           workspaces:
             - name: source
