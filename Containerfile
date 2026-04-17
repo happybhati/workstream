@@ -26,4 +26,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
+ENV WORKSTREAM_HOST=0.0.0.0
+ENV WORKSTREAM_PORT=8080
+
 ENTRYPOINT ["python3", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]

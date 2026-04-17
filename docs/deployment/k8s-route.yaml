@@ -1,0 +1,17 @@
+# OpenShift Route with TLS edge termination.
+# For plain Kubernetes, use an Ingress resource instead.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: workstream
+  labels:
+    app: workstream
+spec:
+  to:
+    kind: Service
+    name: workstream
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

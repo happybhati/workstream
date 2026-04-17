@@ -39,6 +39,9 @@ logs/
 *.swo
 *~
 
+# --- Linter / formatter cache ---
+.ruff_cache/
+
 # --- Container ---
 *.tar
 
