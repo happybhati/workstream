@@ -1,0 +1,23 @@
+[project]
+name = "workstream"
+version = "1.0.0"
+description = "Developer productivity dashboard -- PRs, tasks, calendar, and AI in one place"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "happybhati"}]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

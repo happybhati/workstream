@@ -42,6 +42,8 @@ logs/
 # --- Generated artifacts ---
 docs/ai_readiness_paper.zip
 docs/ai_readiness_paper.tex
+.agentready/
+*.prof
 
 # --- Personal / local-only docs ---
 docs/DEMO_SCRIPT.md

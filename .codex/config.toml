@@ -1,0 +1,14 @@
+[setup]
+commands = [
+  "pip install -r requirements.txt",
+]
+
+[verify]
+commands = [
+  "python -m pytest tests/ -v",
+  "ruff check .",
+]
+
+[run]
+command = "python app.py"
+port = 8080
