@@ -3,6 +3,7 @@
 All tools read from the shared SQLite database populated by the
 collector and analyzer. They never expose secrets or raw tokens.
 """
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ from config import settings
 
 DB_PATH = settings.db_path
 
+
 def _load_tracked_repos() -> dict[str, dict]:
     """Load repo metadata from the intelligence DB tables (populated by collection scans).
 
@@ -20,9 +22,7 @@ def _load_tracked_repos() -> dict[str, dict]:
     """
     try:
         db = _get_db()
-        rows = db.execute(
-            "SELECT DISTINCT repo FROM ri_pull_requests"
-        ).fetchall()
+        rows = db.execute("SELECT DISTINCT repo FROM ri_pull_requests").fetchall()
         db.close()
         return {r["repo"]: {} for r in rows}
     except Exception:
@@ -39,6 +39,7 @@ def _get_db() -> sqlite3.Connection:
 # ---------------------------------------------------------------------------
 # Domain Knowledge Tools
 # ---------------------------------------------------------------------------
+
 
 def list_release_repos() -> list[dict]:
     """Return all tracked repositories with metadata from the intelligence DB."""
@@ -58,14 +59,13 @@ def get_repo_context(repo: str) -> dict:
     db = _get_db()
     try:
         # PR stats from review intelligence
-        row = db.execute(
-            "SELECT COUNT(*) as cnt FROM ri_pull_requests WHERE repo = ?", (repo,)
-        ).fetchone()
+        row = db.execute("SELECT COUNT(*) as cnt FROM ri_pull_requests WHERE repo = ?", (repo,)).fetchone()
         pr_count = row["cnt"] if row else 0
 
         row = db.execute(
             "SELECT COUNT(*) as cnt FROM ri_review_comments c "
-            "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ?", (repo,)
+            "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ?",
+            (repo,),
         ).fetchone()
         comment_count = row["cnt"] if row else 0
 
@@ -73,7 +73,8 @@ def get_repo_context(repo: str) -> dict:
         rows = db.execute(
             "SELECT c.reviewer, COUNT(*) as cnt FROM ri_review_comments c "
             "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ? "
-            "GROUP BY c.reviewer ORDER BY cnt DESC LIMIT 5", (repo,)
+            "GROUP BY c.reviewer ORDER BY cnt DESC LIMIT 5",
+            (repo,),
         ).fetchall()
         top_reviewers = [{"reviewer": r["reviewer"], "comments": r["cnt"]} for r in rows]
 
@@ -81,14 +82,16 @@ def get_repo_context(repo: str) -> dict:
         rows = db.execute(
             "SELECT c.category, COUNT(*) as cnt FROM ri_review_comments c "
             "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ? "
-            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC", (repo,)
+            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC",
+            (repo,),
         ).fetchall()
         categories = {r["category"]: r["cnt"] for r in rows}
 
         # Recent PRs from dashboard
         rows = db.execute(
             "SELECT number, title, author, state, url, updated_at FROM pull_requests "
-            "WHERE repo_full_name = ? ORDER BY updated_at DESC LIMIT 10", (repo,)
+            "WHERE repo_full_name = ? ORDER BY updated_at DESC LIMIT 10",
+            (repo,),
         ).fetchall()
         recent_prs = [dict(r) for r in rows]
 
@@ -113,13 +116,13 @@ def get_recent_prs(repo: str, state: str = "open", limit: int = 10) -> list[dict
     try:
         if state == "all":
             rows = db.execute(
-                "SELECT * FROM pull_requests WHERE repo_full_name = ? "
-                "ORDER BY updated_at DESC LIMIT ?", (repo, limit)
+                "SELECT * FROM pull_requests WHERE repo_full_name = ? ORDER BY updated_at DESC LIMIT ?",
+                (repo, limit),
             ).fetchall()
         else:
             rows = db.execute(
-                "SELECT * FROM pull_requests WHERE repo_full_name = ? AND state = ? "
-                "ORDER BY updated_at DESC LIMIT ?", (repo, state, limit)
+                "SELECT * FROM pull_requests WHERE repo_full_name = ? AND state = ? ORDER BY updated_at DESC LIMIT ?",
+                (repo, state, limit),
             ).fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -129,6 +132,7 @@ def get_recent_prs(repo: str, state: str = "open", limit: int = 10) -> list[dict
 # ---------------------------------------------------------------------------
 # Review Intelligence Tools
 # ---------------------------------------------------------------------------
+
 
 def get_review_patterns(repo: str = "", category: str = "") -> list[dict]:
     """Get recurring review patterns, optionally filtered by repo and category."""
@@ -156,9 +160,7 @@ def get_reviewer_profile(reviewer: str) -> dict:
     """Get detailed profile for a specific reviewer."""
     db = _get_db()
     try:
-        row = db.execute(
-            "SELECT * FROM ri_reviewer_profiles WHERE reviewer = ?", (reviewer,)
-        ).fetchone()
+        row = db.execute("SELECT * FROM ri_reviewer_profiles WHERE reviewer = ?", (reviewer,)).fetchone()
         if not row:
             return {"error": f"No profile found for reviewer: {reviewer}"}
         d = dict(row)
@@ -173,7 +175,8 @@ def get_reviewer_profile(reviewer: str) -> dict:
         rows = db.execute(
             "SELECT c.body, c.file_path, c.category, p.repo, p.title as pr_title "
             "FROM ri_review_comments c JOIN ri_pull_requests p ON c.pr_id = p.id "
-            "WHERE c.reviewer = ? ORDER BY c.created_at DESC LIMIT 10", (reviewer,)
+            "WHERE c.reviewer = ? ORDER BY c.created_at DESC LIMIT 10",
+            (reviewer,),
         ).fetchall()
         d["recent_comments"] = [dict(r) for r in rows]
         return d
@@ -208,8 +211,7 @@ def get_team_standards() -> dict:
     try:
         # Top patterns by frequency
         rows = db.execute(
-            "SELECT category, pattern, frequency, example_comment "
-            "FROM ri_patterns ORDER BY frequency DESC LIMIT 30"
+            "SELECT category, pattern, frequency, example_comment FROM ri_patterns ORDER BY frequency DESC LIMIT 30"
         ).fetchall()
         patterns = [dict(r) for r in rows]
 
@@ -307,6 +309,7 @@ def get_similar_reviews(file_path: str) -> list[dict]:
 # Enhanced Review Tools
 # ---------------------------------------------------------------------------
 
+
 def generate_contextual_review_prompt(pr_id: str) -> dict:
     """Build a review prompt enriched with team context and past patterns.
 
@@ -323,8 +326,8 @@ def generate_contextual_review_prompt(pr_id: str) -> dict:
 
         # Repo-specific patterns
         rows = db.execute(
-            "SELECT category, pattern, example_comment FROM ri_patterns "
-            "WHERE repo = ? ORDER BY frequency DESC LIMIT 5", (repo,)
+            "SELECT category, pattern, example_comment FROM ri_patterns WHERE repo = ? ORDER BY frequency DESC LIMIT 5",
+            (repo,),
         ).fetchall()
         repo_patterns = [dict(r) for r in rows]
 
@@ -348,7 +351,8 @@ def generate_contextual_review_prompt(pr_id: str) -> dict:
         rows = db.execute(
             "SELECT c.category, COUNT(*) as cnt FROM ri_review_comments c "
             "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ? "
-            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC", (repo,)
+            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC",
+            (repo,),
         ).fetchall()
         focus_areas = {r["category"]: r["cnt"] for r in rows}
 
@@ -406,9 +410,7 @@ def get_review_statistics() -> dict:
     db = _get_db()
     try:
         # PR counts by repo
-        rows = db.execute(
-            "SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo"
-        ).fetchall()
+        rows = db.execute("SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo").fetchall()
         prs_by_repo = {r["repo"]: r["cnt"] for r in rows}
 
         total_prs = sum(prs_by_repo.values())
@@ -434,8 +436,7 @@ def get_review_statistics() -> dict:
 
         # Top reviewers
         rows = db.execute(
-            "SELECT reviewer, total_comments FROM ri_reviewer_profiles "
-            "ORDER BY total_comments DESC LIMIT 10"
+            "SELECT reviewer, total_comments FROM ri_reviewer_profiles ORDER BY total_comments DESC LIMIT 10"
         ).fetchall()
         top_reviewers = [{"reviewer": r["reviewer"], "comments": r["total_comments"]} for r in rows]
 

@@ -1,10 +1,10 @@
 """Lightweight agent telemetry: tracks AI interactions, token usage, and costs."""
+
 from __future__ import annotations
 
 import json
 import logging
 import sqlite3
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -26,7 +26,8 @@ def _init_telemetry_schema() -> None:
     db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db)
     try:
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS agent_telemetry (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_name TEXT NOT NULL,
@@ -43,15 +44,20 @@ def _init_telemetry_schema() -> None:
                 metadata TEXT DEFAULT '{}',
                 created_at TEXT NOT NULL
             )
-        """)
-        conn.execute("""
+        """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_telemetry_agent_time
             ON agent_telemetry (agent_name, created_at DESC)
-        """)
-        conn.execute("""
+        """
+        )
+        conn.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_telemetry_time
             ON agent_telemetry (created_at DESC)
-        """)
+        """
+        )
         conn.commit()
     finally:
         conn.close()
@@ -97,8 +103,21 @@ def record_event(
                    (agent_name, operation, provider, model, input_tokens, output_tokens,
                     total_tokens, cost_usd, latency_ms, status, error, metadata, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (agent_name, operation, provider, model, input_tokens, output_tokens,
-                 total, cost, latency_ms, status, error, json.dumps(metadata or {}), now),
+                (
+                    agent_name,
+                    operation,
+                    provider,
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    total,
+                    cost,
+                    latency_ms,
+                    status,
+                    error,
+                    json.dumps(metadata or {}),
+                    now,
+                ),
             )
             conn.commit()
         finally:
@@ -114,7 +133,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
     conn.row_factory = sqlite3.Row
     try:
         cutoff = datetime.now(timezone.utc).isoformat()[:10]
-        cur = conn.execute("""
+        cur = conn.execute(
+            """
             SELECT
                 agent_name,
                 COUNT(*) as total_ops,
@@ -126,7 +146,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             FROM agent_telemetry
             GROUP BY agent_name
             ORDER BY total_ops DESC
-        """)
+        """
+        )
         by_agent = {}
         for row in cur.fetchall():
             by_agent[row["agent_name"]] = {
@@ -138,22 +159,27 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
                 "error_count": row["error_count"],
             }
 
-        cur = conn.execute("""
+        cur = conn.execute(
+            """
             SELECT
                 COUNT(*) as total_events,
                 SUM(total_tokens) as all_tokens,
                 SUM(cost_usd) as all_cost,
                 AVG(latency_ms) as avg_latency
             FROM agent_telemetry
-        """)
+        """
+        )
         totals_row = cur.fetchone()
 
-        cur = conn.execute("""
+        cur = conn.execute(
+            """
             SELECT * FROM agent_telemetry ORDER BY id DESC LIMIT 20
-        """)
+        """
+        )
         recent = [dict(r) for r in cur.fetchall()]
 
-        cur = conn.execute("""
+        cur = conn.execute(
+            """
             SELECT
                 date(created_at) as day,
                 COUNT(*) as ops,
@@ -163,7 +189,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             GROUP BY date(created_at)
             ORDER BY day DESC
             LIMIT 30
-        """)
+        """
+        )
         daily = [dict(r) for r in cur.fetchall()]
 
         return {
@@ -171,8 +198,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             "totals": {
                 "total_events": totals_row["total_events"] if totals_row else 0,
                 "total_tokens": totals_row["all_tokens"] or 0 if totals_row else 0,
-                "total_cost": round(totals_row["all_cost"] or 0, 6) if totals_row else 0,
-                "avg_latency_ms": round(totals_row["avg_latency"] or 0) if totals_row else 0,
+                "total_cost": (round(totals_row["all_cost"] or 0, 6) if totals_row else 0),
+                "avg_latency_ms": (round(totals_row["avg_latency"] or 0) if totals_row else 0),
             },
             "recent_events": recent,
             "daily_stats": daily,

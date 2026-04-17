@@ -37,20 +37,27 @@ class Settings(BaseSettings):
     # --- Paths (default to project-relative locations) ---
     db_path: Path = Path(os.getenv("DB_PATH", str(_PROJECT_DIR / "data.db")))
     log_dir: Path = Path(os.getenv("LOG_DIR", str(_PROJECT_DIR / "logs")))
-    repos_yaml_path: Path = Path(os.getenv(
-        "REPOS_YAML", str(_PROJECT_DIR / "repos.yaml"),
-    ))
+    repos_yaml_path: Path = Path(
+        os.getenv(
+            "REPOS_YAML",
+            str(_PROJECT_DIR / "repos.yaml"),
+        )
+    )
 
     # --- Google Calendar ---
-    google_credentials_path: Path = Path(os.getenv(
-        "GOOGLE_CREDENTIALS_PATH", str(_PROJECT_DIR / "google_credentials.json"),
-    ))
-    google_token_path: Path = Path(os.getenv(
-        "GOOGLE_TOKEN_PATH", str(_PROJECT_DIR / "google_token.json"),
-    ))
-    google_calendar_ids: list[str] = (
-        os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",")
+    google_credentials_path: Path = Path(
+        os.getenv(
+            "GOOGLE_CREDENTIALS_PATH",
+            str(_PROJECT_DIR / "google_credentials.json"),
+        )
     )
+    google_token_path: Path = Path(
+        os.getenv(
+            "GOOGLE_TOKEN_PATH",
+            str(_PROJECT_DIR / "google_token.json"),
+        )
+    )
+    google_calendar_ids: list[str] = os.getenv("GOOGLE_CALENDAR_IDS", "primary").split(",")
 
     # --- AI Review Providers (all optional) ---
     ai_ollama_url: str = os.getenv("AI_OLLAMA_URL", "http://localhost:11434")

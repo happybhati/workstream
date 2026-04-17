@@ -1,0 +1,64 @@
+# Konflux PipelineRun for pushes to main
+# Builds and pushes the container image to Quay.io
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: workstream-on-push
+  annotations:
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[main]"
+    pipelinesascode.tekton.dev/max-keep-runs: "5"
+  labels:
+    appstudio.openshift.io/application: workstream
+    appstudio.openshift.io/component: workstream
+    pipelines.appstudio.openshift.io/type: build
+spec:
+  pipelineSpec:
+    tasks:
+      - name: clone
+        taskRef:
+          resolver: bundles
+          params:
+            - name: bundle
+              value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.1
+            - name: name
+              value: git-clone
+            - name: kind
+              value: task
+        params:
+          - name: url
+            value: "{{repo_url}}"
+          - name: revision
+            value: "{{revision}}"
+        workspaces:
+          - name: output
+            workspace: workspace
+
+      - name: build-image
+        runAfter: ["clone"]
+        taskRef:
+          resolver: bundles
+          params:
+            - name: bundle
+              value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.2
+            - name: name
+              value: buildah
+            - name: kind
+              value: task
+        params:
+          - name: IMAGE
+            value: quay.io/happybhati/workstream
+          - name: DOCKERFILE
+            value: Containerfile
+        workspaces:
+          - name: source
+            workspace: workspace
+
+  workspaces:
+    - name: workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi

@@ -17,6 +17,7 @@ Produces tool-specific files:
 
 Also handles creating draft PRs via the GitHub API.
 """
+
 from __future__ import annotations
 
 import base64
@@ -44,6 +45,7 @@ def _github_headers() -> dict:
 # ---------------------------------------------------------------------------
 # Gap analysis helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_existing_info(scan: dict) -> dict:
     """Extract what is already documented in existing files to avoid redundancy."""
@@ -133,6 +135,7 @@ def _infer_commands(scan: dict) -> dict:
 # ---------------------------------------------------------------------------
 # AGENTS.md -- gap-filling: only non-redundant info
 # ---------------------------------------------------------------------------
+
 
 def generate_agents_md(scan: dict, intelligence: dict | None = None) -> str:
     owner = scan["owner"]
@@ -234,6 +237,7 @@ def generate_agents_md(scan: dict, intelligence: dict | None = None) -> str:
 # CLAUDE.md -- imperative commands, not descriptions
 # ---------------------------------------------------------------------------
 
+
 def generate_claude_md(scan: dict, intelligence: dict | None = None) -> str:
     owner = scan["owner"]
     repo = scan["repo"]
@@ -289,6 +293,7 @@ def generate_claude_md(scan: dict, intelligence: dict | None = None) -> str:
 # GEMINI.md -- hierarchical with @imports
 # ---------------------------------------------------------------------------
 
+
 def generate_gemini_md(scan: dict) -> str:
     owner = scan["owner"]
     repo = scan["repo"]
@@ -305,11 +310,11 @@ def generate_gemini_md(scan: dict) -> str:
 
     lines += ["## Setup", ""]
     for cmd in cmds["install"] + cmds["build"]:
-        lines += [f"```bash", f"{cmd}", "```", ""]
+        lines += ["```bash", f"{cmd}", "```", ""]
 
     lines += ["## Testing", ""]
     for cmd in cmds["test"]:
-        lines += [f"```bash", f"{cmd}", "```", ""]
+        lines += ["```bash", f"{cmd}", "```", ""]
 
     lines += ["## Code Style", ""]
     if "go" in lang:
@@ -339,6 +344,7 @@ def generate_gemini_md(scan: dict) -> str:
 # ---------------------------------------------------------------------------
 # .github/copilot-instructions.md -- under 4000 chars for code review
 # ---------------------------------------------------------------------------
+
 
 def generate_copilot_instructions(scan: dict) -> str:
     owner = scan["owner"]
@@ -383,6 +389,7 @@ def generate_copilot_instructions(scan: dict) -> str:
 # ---------------------------------------------------------------------------
 # .cursor/rules/repo.mdc -- YAML frontmatter + glob patterns
 # ---------------------------------------------------------------------------
+
 
 def generate_cursor_rules(scan: dict, intelligence: dict | None = None) -> str:
     owner = scan["owner"]
@@ -457,6 +464,7 @@ def generate_cursor_rules(scan: dict, intelligence: dict | None = None) -> str:
 # .codex/config.toml -- setup and verify commands
 # ---------------------------------------------------------------------------
 
+
 def generate_codex_config(scan: dict) -> str:
     cmds = _infer_commands(scan)
 
@@ -489,6 +497,7 @@ def generate_codex_config(scan: dict) -> str:
 # ---------------------------------------------------------------------------
 # ARCHITECTURE.md
 # ---------------------------------------------------------------------------
+
 
 def generate_architecture_md(scan: dict) -> str:
     owner = scan["owner"]
@@ -565,6 +574,7 @@ def generate_architecture_md(scan: dict) -> str:
 # CONTRIBUTING.md
 # ---------------------------------------------------------------------------
 
+
 def generate_contributing_md(scan: dict) -> str:
     owner = scan["owner"]
     repo = scan["repo"]
@@ -592,8 +602,13 @@ def generate_contributing_md(scan: dict) -> str:
         elif "package.json" in dep_name:
             lines += ["```bash", "npm install", "npm run build  # if applicable", "```"]
         elif "requirements.txt" in dep_name:
-            lines += ["```bash", "python -m venv venv", "source venv/bin/activate",
-                      "pip install -r requirements.txt", "```"]
+            lines += [
+                "```bash",
+                "python -m venv venv",
+                "source venv/bin/activate",
+                "pip install -r requirements.txt",
+                "```",
+            ]
         elif "Cargo.toml" in dep_name:
             lines += ["```bash", "cargo build", "```"]
         else:
@@ -642,6 +657,7 @@ def generate_contributing_md(scan: dict) -> str:
 # Generate files -- GAP-FILLING logic
 # ---------------------------------------------------------------------------
 
+
 def generate_files(scan: dict, score_result: dict | None = None, intelligence: dict | None = None) -> dict[str, str]:
     """Return a dict of {filepath: content} for files that should be generated.
 
@@ -681,6 +697,7 @@ def generate_files(scan: dict, score_result: dict | None = None, intelligence: d
 # ---------------------------------------------------------------------------
 # Draft PR creation via GitHub API
 # ---------------------------------------------------------------------------
+
 
 async def create_draft_pr(
     owner: str,
@@ -746,7 +763,8 @@ async def create_draft_pr(
                 logger.warning("Failed to create %s: %s", filepath, resp.status_code)
 
         file_list = ", ".join(f"`{f}`" for f in files.keys())
-        pr_body = dedent(f"""\
+        pr_body = dedent(
+            f"""\
             ## AI Readiness Bootstrap
 
             This PR adds foundational files to make this repository more accessible
@@ -765,7 +783,8 @@ async def create_draft_pr(
 
             ---
             *Generated by [Workstream AI Readiness Analyzer](http://localhost:8080)*
-        """)
+        """
+        )
 
         resp = await client.post(
             f"/repos/{owner}/{repo}/pulls",
@@ -791,6 +810,7 @@ async def create_draft_pr(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _dir_purpose(dirname: str, tree: list[str]) -> str:
     d = dirname.lower()

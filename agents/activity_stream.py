@@ -4,10 +4,10 @@ Emits events via SSE in a format compatible with the Agent Observability
 Protocol (AOP). External AOP collectors can consume the /api/agents/stream
 endpoint directly.
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import uuid
 from collections import deque

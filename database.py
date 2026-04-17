@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import aiosqlite
-from pathlib import Path
 
 from config import settings
 
@@ -208,9 +207,7 @@ async def init_db() -> None:
         cursor = await db.execute("PRAGMA table_info(yearly_completions)")
         cols = {row[1] for row in await cursor.fetchall()}
         if "same_period" not in cols:
-            await db.execute(
-                "ALTER TABLE yearly_completions ADD COLUMN same_period INTEGER NOT NULL DEFAULT 0"
-            )
+            await db.execute("ALTER TABLE yearly_completions ADD COLUMN same_period INTEGER NOT NULL DEFAULT 0")
         for table in ("pull_requests", "jira_issues"):
             cursor = await db.execute(f"PRAGMA table_info({table})")
             cols = {row[1] for row in await cursor.fetchall()}
@@ -240,6 +237,7 @@ async def init_db() -> None:
 
 async def upsert_pr(pr: dict) -> None:
     from datetime import datetime, timezone
+
     pr.setdefault("assigned_to", "")
     pr.setdefault("review_state", "")
     pr.setdefault("approved_by", "")
@@ -295,8 +293,7 @@ async def insert_activity(activity: dict) -> None:
         await db.close()
 
 
-async def get_my_prs(username_github: str, username_gitlab: str,
-                     include_closed: bool = False) -> list[dict]:
+async def get_my_prs(username_github: str, username_gitlab: str, include_closed: bool = False) -> list[dict]:
     db = await get_db()
     try:
         state_filter = "" if include_closed else "AND state IN ('open', 'draft')"
@@ -349,6 +346,7 @@ async def get_review_requests(username_github: str, username_gitlab: str) -> lis
 
 async def upsert_jira_issue(issue: dict) -> None:
     from datetime import datetime, timezone
+
     issue["polled_at"] = datetime.now(timezone.utc).isoformat()
     db = await get_db()
     try:
@@ -382,8 +380,7 @@ async def upsert_jira_issue(issue: dict) -> None:
         await db.close()
 
 
-async def get_jira_tasks(role_filter: str = "all", status_category: str = "all",
-                         sprint: str = "all") -> list[dict]:
+async def get_jira_tasks(role_filter: str = "all", status_category: str = "all", sprint: str = "all") -> list[dict]:
     db = await get_db()
     try:
         conditions = []
@@ -419,21 +416,15 @@ async def get_jira_stats() -> dict:
     try:
         result: dict = {"by_status": {}, "by_role": {}, "total": 0}
 
-        cursor = await db.execute(
-            "SELECT status_category, COUNT(*) as cnt FROM jira_issues GROUP BY status_category"
-        )
+        cursor = await db.execute("SELECT status_category, COUNT(*) as cnt FROM jira_issues GROUP BY status_category")
         for row in await cursor.fetchall():
             result["by_status"][row["status_category"]] = row["cnt"]
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('assignee', 'both')"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('assignee', 'both')")
         row = await cursor.fetchone()
         result["by_role"]["assignee"] = row["cnt"] if row else 0
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('reporter', 'both')"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE role IN ('reporter', 'both')")
         row = await cursor.fetchone()
         result["by_role"]["reporter"] = row["cnt"] if row else 0
 
@@ -441,9 +432,7 @@ async def get_jira_stats() -> dict:
         row = await cursor.fetchone()
         result["total"] = row["cnt"] if row else 0
 
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM jira_issues WHERE sprint_state = 'active'"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM jira_issues WHERE sprint_state = 'active'")
         row = await cursor.fetchone()
         result["in_sprint"] = row["cnt"] if row else 0
 
@@ -454,6 +443,7 @@ async def get_jira_stats() -> dict:
 
 async def upsert_yearly_completion(year: int, completed: int, same_period: int = 0) -> None:
     from datetime import datetime, timezone
+
     db = await get_db()
     try:
         await db.execute(
@@ -463,8 +453,12 @@ async def upsert_yearly_completion(year: int, completed: int, same_period: int =
                    completed=excluded.completed,
                    same_period=excluded.same_period,
                    updated_at=excluded.updated_at""",
-            {"year": year, "completed": completed, "same_period": same_period,
-             "updated_at": datetime.now(timezone.utc).isoformat()},
+            {
+                "year": year,
+                "completed": completed,
+                "same_period": same_period,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
         )
         await db.commit()
     finally:
@@ -507,9 +501,7 @@ async def upsert_active_sprint(sprint: dict) -> None:
 async def get_active_sprints() -> list[dict]:
     db = await get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM active_sprints WHERE state = 'active' ORDER BY project"
-        )
+        cursor = await db.execute("SELECT * FROM active_sprints WHERE state = 'active' ORDER BY project")
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -620,7 +612,8 @@ async def clear_calendar_events() -> None:
 
 
 async def get_events_for_date(target_date=None) -> list[dict]:
-    from datetime import datetime, timedelta
+    from datetime import datetime
+
     if target_date is None:
         target_date = datetime.now().date()
     day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0).isoformat()
@@ -647,6 +640,7 @@ async def get_today_events() -> list[dict]:
 
 async def get_tomorrow_events() -> list[dict]:
     from datetime import datetime, timedelta
+
     tomorrow = (datetime.now() + timedelta(days=1)).date()
     return await get_events_for_date(tomorrow)
 

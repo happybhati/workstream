@@ -5,6 +5,7 @@ team coding standards to AI agents in Cursor via the Model Context Protocol.
 
 Run via: python -m mcp_server.release_service_mcp
 """
+
 from __future__ import annotations
 
 import json
@@ -19,17 +20,16 @@ if _dashboard_root not in sys.path:
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools import (
-    list_release_repos,
-    get_repo_context,
-    get_recent_prs,
-    get_review_patterns,
-    get_reviewer_profile,
-    search_past_reviews,
-    get_team_standards,
-    get_similar_reviews,
     generate_contextual_review_prompt,
+    get_recent_prs,
+    get_repo_context,
+    get_review_patterns,
     get_review_statistics,
-    RELEASE_REPOS,
+    get_reviewer_profile,
+    get_similar_reviews,
+    get_team_standards,
+    list_release_repos,
+    search_past_reviews,
 )
 
 mcp = FastMCP(
@@ -47,6 +47,7 @@ mcp = FastMCP(
 # ---------------------------------------------------------------------------
 # Domain Knowledge Tools
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 def tool_list_release_repos() -> str:
@@ -88,6 +89,7 @@ def tool_get_recent_prs(repo: str, state: str = "open", limit: int = 10) -> str:
 # ---------------------------------------------------------------------------
 # Review Intelligence Tools
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 def tool_get_review_patterns(repo: str = "", category: str = "") -> str:
@@ -186,6 +188,7 @@ def tool_get_review_statistics() -> str:
 # ---------------------------------------------------------------------------
 # MCP Resources
 # ---------------------------------------------------------------------------
+
 
 @mcp.resource("release://repos")
 def resource_repos() -> str:

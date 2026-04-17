@@ -10,6 +10,7 @@ Scoring rubric (120 raw points, normalized to 100):
   Code Structure       20 pts
   Security & Safety    20 pts
 """
+
 from __future__ import annotations
 
 import re
@@ -50,6 +51,7 @@ def _finding(present: bool, label: str, pts: int) -> dict:
 # Agent Configuration (30 pts)
 # ---------------------------------------------------------------------------
 
+
 def _score_agent_config(scan: dict) -> dict:
     score = 0
     findings = []
@@ -80,7 +82,13 @@ def _score_agent_config(scan: dict) -> dict:
 
     cursor_rules = scan.get("cursor_rules", [])
     if cursor_rules:
-        findings.append(_finding(True, f".cursor/rules/ directory ({len(cursor_rules)} file{'s' if len(cursor_rules) != 1 else ''})", 5))
+        findings.append(
+            _finding(
+                True,
+                f".cursor/rules/ directory ({len(cursor_rules)} file{'s' if len(cursor_rules) != 1 else ''})",
+                5,
+            )
+        )
         score += 5
     else:
         findings.append(_finding(False, ".cursor/rules/ not found", 0))
@@ -113,6 +121,7 @@ def _score_agent_config(scan: dict) -> dict:
 # Documentation (25 pts)
 # ---------------------------------------------------------------------------
 
+
 def _score_documentation(scan: dict) -> dict:
     score = 0
     findings = []
@@ -126,12 +135,14 @@ def _score_documentation(scan: dict) -> dict:
             findings.append(_finding(True, "README.md exists but is short", 4))
             score += 4
 
-        has_build_cmds = bool(re.search(
-            r"(?i)(go\s+(build|test|run|mod)|npm\s+(install|test|run)|"
-            r"pip\s+install|cargo\s+(build|test)|make\s+\w+|pytest|"
-            r"mvn\s+|gradle\s+|yarn\s+(install|test))",
-            readme
-        ))
+        has_build_cmds = bool(
+            re.search(
+                r"(?i)(go\s+(build|test|run|mod)|npm\s+(install|test|run)|"
+                r"pip\s+install|cargo\s+(build|test)|make\s+\w+|pytest|"
+                r"mvn\s+|gradle\s+|yarn\s+(install|test))",
+                readme,
+            )
+        )
         if has_build_cmds:
             bonus = min(2, max(0, 8 - score))
             if bonus > 0:
@@ -171,6 +182,7 @@ def _score_documentation(scan: dict) -> dict:
 # ---------------------------------------------------------------------------
 # CI/CD & Quality (25 pts)
 # ---------------------------------------------------------------------------
+
 
 def _score_ci_quality(scan: dict) -> dict:
     score = 0
@@ -220,6 +232,7 @@ def _score_ci_quality(scan: dict) -> dict:
 # Code Structure (20 pts)
 # ---------------------------------------------------------------------------
 
+
 def _score_code_structure(scan: dict) -> dict:
     score = 0
     findings = []
@@ -254,7 +267,13 @@ def _score_code_structure(scan: dict) -> dict:
 
     dep_files = scan.get("dep_files", [])
     if dep_files:
-        findings.append(_finding(True, f"Dependency management ({', '.join(p.split('/')[-1] for p in dep_files[:3])})", 4))
+        findings.append(
+            _finding(
+                True,
+                f"Dependency management ({', '.join(p.split('/')[-1] for p in dep_files[:3])})",
+                4,
+            )
+        )
         score += 4
     else:
         findings.append(_finding(False, "No dependency management file", 0))
@@ -273,6 +292,7 @@ def _score_code_structure(scan: dict) -> dict:
 # Security & Safety (20 pts) -- NEW
 # ---------------------------------------------------------------------------
 
+
 def _score_security(scan: dict) -> dict:
     score = 0
     findings = []
@@ -282,7 +302,13 @@ def _score_security(scan: dict) -> dict:
         findings.append(_finding(True, "No secret files committed (.env, credentials, keys)", 5))
         score += 5
     else:
-        findings.append(_finding(False, f"Potential secret files in repo: {', '.join(secrets_in_tree[:3])}", 0))
+        findings.append(
+            _finding(
+                False,
+                f"Potential secret files in repo: {', '.join(secrets_in_tree[:3])}",
+                0,
+            )
+        )
 
     if scan.get("gitignore_covers_secrets"):
         findings.append(_finding(True, ".gitignore covers secret patterns", 3))
@@ -317,6 +343,7 @@ def _score_security(scan: dict) -> dict:
 # Grading
 # ---------------------------------------------------------------------------
 
+
 def _letter_grade(normalized: int) -> str:
     if normalized >= 90:
         return "A"
@@ -333,99 +360,126 @@ def _letter_grade(normalized: int) -> str:
 # Recommendations
 # ---------------------------------------------------------------------------
 
+
 def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
     recs = []
 
     agent = categories["agent_config"]
     if not scan["key_files"].get("AGENTS.md"):
-        recs.append({
-            "priority": "high",
-            "text": "Add an AGENTS.md file to guide AI agents through your codebase",
-            "impact": "+8 pts",
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "text": "Add an AGENTS.md file to guide AI agents through your codebase",
+                "impact": "+8 pts",
+            }
+        )
 
     if not scan["key_files"].get("CLAUDE.md"):
-        recs.append({
-            "priority": "medium",
-            "text": "Add CLAUDE.md with imperative commands for Claude Code",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add CLAUDE.md with imperative commands for Claude Code",
+                "impact": "+3 pts",
+            }
+        )
 
     if not scan.get("cursor_rules"):
-        recs.append({
-            "priority": "medium",
-            "text": "Add .cursor/rules/ directory with project-specific rules",
-            "impact": "+4 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add .cursor/rules/ directory with project-specific rules",
+                "impact": "+4 pts",
+            }
+        )
 
     if not scan["key_files"].get(".github/copilot-instructions.md"):
-        recs.append({
-            "priority": "low",
-            "text": "Add .github/copilot-instructions.md for Copilot code review",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "low",
+                "text": "Add .github/copilot-instructions.md for Copilot code review",
+                "impact": "+3 pts",
+            }
+        )
 
     docs = categories["documentation"]
     if not scan["key_files"].get("ARCHITECTURE.md"):
-        recs.append({
-            "priority": "high",
-            "text": "Add ARCHITECTURE.md describing system structure and key design decisions",
-            "impact": "+6 pts",
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "text": "Add ARCHITECTURE.md describing system structure and key design decisions",
+                "impact": "+6 pts",
+            }
+        )
     if not scan["key_files"].get("CONTRIBUTING.md"):
-        recs.append({
-            "priority": "medium",
-            "text": "Add CONTRIBUTING.md with build, test, and submission instructions",
-            "impact": "+4 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add CONTRIBUTING.md with build, test, and submission instructions",
+                "impact": "+4 pts",
+            }
+        )
 
     ci = categories["ci_quality"]
     if not scan.get("has_ci"):
-        recs.append({
-            "priority": "high",
-            "text": "Set up GitHub Actions for CI/CD (lint, test, build)",
-            "impact": "+7 pts",
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "text": "Set up GitHub Actions for CI/CD (lint, test, build)",
+                "impact": "+7 pts",
+            }
+        )
     if not scan["key_files"].get("CODEOWNERS"):
-        recs.append({
-            "priority": "low",
-            "text": "Add a CODEOWNERS file for automatic review assignment",
-            "impact": "+4 pts",
-        })
+        recs.append(
+            {
+                "priority": "low",
+                "text": "Add a CODEOWNERS file for automatic review assignment",
+                "impact": "+4 pts",
+            }
+        )
 
     structure = categories["code_structure"]
     if not scan.get("dep_files"):
-        recs.append({
-            "priority": "medium",
-            "text": "Add explicit dependency management (go.mod, package.json, etc.)",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add explicit dependency management (go.mod, package.json, etc.)",
+                "impact": "+3 pts",
+            }
+        )
 
     security = categories["security"]
     if scan.get("secrets_in_tree"):
-        recs.append({
-            "priority": "critical",
-            "text": "Remove committed secret files (.env, credentials) from the repository",
-            "impact": "+4 pts",
-        })
+        recs.append(
+            {
+                "priority": "critical",
+                "text": "Remove committed secret files (.env, credentials) from the repository",
+                "impact": "+4 pts",
+            }
+        )
     if not scan.get("gitignore_covers_secrets"):
-        recs.append({
-            "priority": "high",
-            "text": "Update .gitignore to cover .env, credentials, and key files",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "text": "Update .gitignore to cover .env, credentials, and key files",
+                "impact": "+3 pts",
+            }
+        )
     if not scan.get("has_dependabot") and not scan.get("has_renovate"):
-        recs.append({
-            "priority": "medium",
-            "text": "Configure Dependabot or Renovate for automated dependency updates",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Configure Dependabot or Renovate for automated dependency updates",
+                "impact": "+3 pts",
+            }
+        )
     if not scan["key_files"].get("SECURITY.md"):
-        recs.append({
-            "priority": "low",
-            "text": "Add SECURITY.md with vulnerability reporting instructions",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "low",
+                "text": "Add SECURITY.md with vulnerability reporting instructions",
+                "impact": "+3 pts",
+            }
+        )
 
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     recs.sort(key=lambda r: priority_order.get(r["priority"], 4))

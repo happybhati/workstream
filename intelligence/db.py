@@ -1,4 +1,5 @@
 """CRUD helpers for Review Intelligence (ri_*) tables."""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ async def _get_db() -> aiosqlite.Connection:
 # ---------------------------------------------------------------------------
 # ri_pull_requests
 # ---------------------------------------------------------------------------
+
 
 async def upsert_ri_pr(pr: dict) -> None:
     pr["collected_at"] = datetime.now(timezone.utc).isoformat()
@@ -48,9 +50,7 @@ async def upsert_ri_pr(pr: dict) -> None:
 async def get_ri_pr(pr_id: str) -> dict | None:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM ri_pull_requests WHERE id = :id", {"id": pr_id}
-        )
+        cursor = await db.execute("SELECT * FROM ri_pull_requests WHERE id = :id", {"id": pr_id})
         row = await cursor.fetchone()
         return dict(row) if row else None
     finally:
@@ -72,9 +72,7 @@ async def get_ri_prs_by_repo(repo: str, limit: int = 100) -> list[dict]:
 async def count_ri_prs() -> dict:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo"
-        )
+        cursor = await db.execute("SELECT repo, COUNT(*) as cnt FROM ri_pull_requests GROUP BY repo")
         rows = await cursor.fetchall()
         result = {row["repo"]: row["cnt"] for row in rows}
         cursor = await db.execute("SELECT COUNT(*) as cnt FROM ri_pull_requests")
@@ -102,6 +100,7 @@ async def get_latest_merged_at(repo: str) -> str | None:
 # ---------------------------------------------------------------------------
 # ri_review_comments
 # ---------------------------------------------------------------------------
+
 
 async def insert_ri_comment(comment: dict) -> None:
     db = await _get_db()
@@ -282,9 +281,7 @@ async def batch_update_categories(updates: list[tuple[int, str]]) -> int:
 async def count_ri_comments() -> dict:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM ri_review_comments"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM ri_review_comments")
         row = await cursor.fetchone()
         total = row["cnt"] if row else 0
 
@@ -308,6 +305,7 @@ async def count_ri_comments() -> dict:
 # ---------------------------------------------------------------------------
 # ri_patterns
 # ---------------------------------------------------------------------------
+
 
 async def upsert_ri_pattern(pattern: dict) -> None:
     pattern["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -360,6 +358,7 @@ async def get_patterns(category: str = "", repo: str = "", limit: int = 50) -> l
 # ---------------------------------------------------------------------------
 # ri_reviewer_profiles
 # ---------------------------------------------------------------------------
+
 
 async def upsert_reviewer_profile(profile: dict) -> None:
     profile["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -415,9 +414,7 @@ async def get_reviewer_profile(reviewer: str) -> dict | None:
 async def get_all_reviewer_profiles() -> list[dict]:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT * FROM ri_reviewer_profiles ORDER BY total_comments DESC"
-        )
+        cursor = await db.execute("SELECT * FROM ri_reviewer_profiles ORDER BY total_comments DESC")
         rows = await cursor.fetchall()
         result = []
         for row in rows:
@@ -438,6 +435,7 @@ async def get_all_reviewer_profiles() -> list[dict]:
 # Aggregate statistics
 # ---------------------------------------------------------------------------
 
+
 async def get_ri_statistics() -> dict:
     """Combined statistics for the Review Intelligence dashboard."""
     pr_counts = await count_ri_prs()
@@ -457,16 +455,14 @@ async def get_ri_statistics() -> dict:
         "comments": comment_counts,
         "pattern_count": pattern_count,
         "reviewer_count": len(profiles),
-        "top_reviewers": [
-            {"reviewer": p["reviewer"], "comments": p["total_comments"]}
-            for p in profiles[:10]
-        ],
+        "top_reviewers": [{"reviewer": p["reviewer"], "comments": p["total_comments"]} for p in profiles[:10]],
     }
 
 
 # ---------------------------------------------------------------------------
 # Repo-scoped queries for per-repo intelligence display
 # ---------------------------------------------------------------------------
+
 
 async def get_repo_intelligence(repo: str) -> dict:
     """Return complete intelligence data for a single repo."""
@@ -558,13 +554,15 @@ async def get_collected_repos() -> list[dict]:
                 {"repo": repo},
             )
             row2 = await cursor2.fetchone()
-            result.append({
-                "repo": repo,
-                "pr_count": r["pr_count"],
-                "comment_count": row2["cnt"] if row2 else 0,
-                "earliest": r["earliest"],
-                "latest": r["latest"],
-            })
+            result.append(
+                {
+                    "repo": repo,
+                    "pr_count": r["pr_count"],
+                    "comment_count": row2["cnt"] if row2 else 0,
+                    "earliest": r["earliest"],
+                    "latest": r["latest"],
+                }
+            )
         return result
     finally:
         await db.close()

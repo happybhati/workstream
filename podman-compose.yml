@@ -1,0 +1,25 @@
+version: "3"
+
+services:
+  workstream:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: quay.io/happybhati/workstream:dev
+    container_name: workstream
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - workstream-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  workstream-data:
