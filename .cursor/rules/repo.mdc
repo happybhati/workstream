@@ -1,0 +1,28 @@
+---
+description: Workstream project conventions
+globs: ["**/*.py", "**/*.html"]
+---
+
+# Workstream Coding Rules
+
+## Python
+- Use Python 3.12+ features and type hints
+- All async I/O with httpx and aiosqlite
+- Follow ruff and black formatting
+- Keep functions under 50 lines
+- Use logging module, not print()
+
+## FastAPI
+- All routes in app.py with section comment headers
+- Return JSONResponse for API endpoints
+- Use Request for body parsing
+
+## Frontend
+- All UI in static/index.html
+- Vanilla JS, no frameworks
+- CSS variables for theming (--accent, --surface, etc.)
+- Tab-based navigation via switchTab()
+
+## Git
+- Conventional commits: feat:, fix:, docs:, chore:, test:
+- Branch naming: feat/, fix/, docs/ prefixes
