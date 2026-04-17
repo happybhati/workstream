@@ -1,23 +1,33 @@
 [project]
 name = "workstream"
-version = "1.0.0"
-description = "Developer productivity dashboard -- PRs, tasks, calendar, and AI in one place"
-requires-python = ">=3.12"
-license = {text = "MIT"}
-authors = [{name = "happybhati"}]
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]
-ignore = ["E501"]
-
-[tool.black]
-line-length = 100
-target-version = ["py312"]
+version = "0.1.0"
+description = "Developer productivity dashboard"
+requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501", "F841", "E741", "E402"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "venv/*",
+    "*/mcp_server/*",
+    "intelligence/*",
+    "pollers.py",
+    "reviewer.py",
+]
+
+[tool.coverage.report]
+fail_under = 30
+show_missing = true

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Workstream CLI for Linux (systemd user service)
+# Usage: workstream-linux install | start | stop | restart | status | logs | open
+set -euo pipefail
+
+DASHBOARD_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SERVICE_NAME="workstream.service"
+SERVICE_DIR="$HOME/.config/systemd/user"
+SERVICE_FILE="$SERVICE_DIR/$SERVICE_NAME"
+
+_ensure_venv() {
+    if [ ! -d "$DASHBOARD_DIR/venv" ]; then
+        echo "Creating Python virtual environment..."
+        python3 -m venv "$DASHBOARD_DIR/venv"
+    fi
+    source "$DASHBOARD_DIR/venv/bin/activate"
+    pip install -q -r "$DASHBOARD_DIR/requirements.txt"
+}
+
+_install_service() {
+    _ensure_venv
+    mkdir -p "$SERVICE_DIR" "$DASHBOARD_DIR/logs"
+
+    cat > "$SERVICE_FILE" <<UNIT
+[Unit]
+Description=Workstream Developer Dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=$DASHBOARD_DIR
+ExecStart=$DASHBOARD_DIR/venv/bin/python -m uvicorn app:app --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:$DASHBOARD_DIR/logs/workstream.log
+StandardError=append:$DASHBOARD_DIR/logs/workstream.log
+
+[Install]
+WantedBy=default.target
+UNIT
+
+    systemctl --user daemon-reload
+    systemctl --user enable "$SERVICE_NAME"
+    echo "Workstream service installed and enabled."
+    echo "  Start:  workstream-linux start"
+    echo "  Logs:   workstream-linux logs"
+    echo "  URL:    http://localhost:8080"
+}
+
+case "${1:-help}" in
+    install)
+        _install_service
+        ;;
+    start)
+        systemctl --user start "$SERVICE_NAME"
+        echo "Workstream started."
+        ;;
+    stop)
+        systemctl --user stop "$SERVICE_NAME"
+        echo "Workstream stopped."
+        ;;
+    restart)
+        systemctl --user restart "$SERVICE_NAME"
+        echo "Workstream restarted."
+        ;;
+    status)
+        systemctl --user status "$SERVICE_NAME" --no-pager || true
+        ;;
+    logs)
+        journalctl --user -u "$SERVICE_NAME" -f --no-pager 2>/dev/null || \
+            tail -f "$DASHBOARD_DIR/logs/workstream.log"
+        ;;
+    open)
+        xdg-open "http://localhost:8080" 2>/dev/null || \
+            echo "Open http://localhost:8080 in your browser"
+        ;;
+    *)
+        echo "Usage: workstream-linux {install|start|stop|restart|status|logs|open}"
+        exit 1
+        ;;
+esac

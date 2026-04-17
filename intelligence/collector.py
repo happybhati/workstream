@@ -3,6 +3,7 @@
 Fetches merged PRs, their reviews, and inline comments from GitHub,
 then stores them in the ri_* tables for pattern analysis.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -15,11 +16,10 @@ import httpx
 
 from config import settings
 from intelligence.db import (
-    upsert_ri_pr,
     bulk_insert_ri_comments,
-    get_latest_merged_at,
-    count_ri_prs,
     comment_node_ids_exist,
+    get_latest_merged_at,
+    upsert_ri_pr,
 )
 
 logger = logging.getLogger("dashboard.intelligence.collector")
@@ -41,6 +41,7 @@ def parse_repo_url(url: str) -> str:
     if len(parts) == 2 and parts[0] and parts[1]:
         return f"{parts[0]}/{parts[1].removesuffix('.git')}"
     raise ValueError(f"Cannot parse GitHub repo from: {url}")
+
 
 GITHUB_API = "https://api.github.com"
 MAX_PER_PAGE = 100
@@ -96,7 +97,9 @@ async def _fetch_merged_prs(
             await _check_rate_limit(client)
             continue
         if resp.status_code != 200:
-            logger.error("Failed to fetch PRs for %s page %d: %s", repo, page, resp.status_code)
+            logger.error(
+                "Failed to fetch PRs for %s page %d: %s", repo, page, resp.status_code
+            )
             break
 
         items = resp.json()
@@ -110,19 +113,21 @@ async def _fetch_merged_prs(
             if pr["merged_at"] < since:
                 found_old = True
                 continue
-            prs.append({
-                "id": f"{repo}:{pr['number']}",
-                "repo": repo,
-                "number": pr["number"],
-                "title": pr["title"],
-                "author": pr["user"]["login"],
-                "merged_at": pr["merged_at"],
-                "base_branch": pr["base"]["ref"],
-                "files_changed": pr.get("changed_files", 0),
-                "additions": pr.get("additions", 0),
-                "deletions": pr.get("deletions", 0),
-                "description": (pr.get("body") or "")[:3000],
-            })
+            prs.append(
+                {
+                    "id": f"{repo}:{pr['number']}",
+                    "repo": repo,
+                    "number": pr["number"],
+                    "title": pr["title"],
+                    "author": pr["user"]["login"],
+                    "merged_at": pr["merged_at"],
+                    "base_branch": pr["base"]["ref"],
+                    "files_changed": pr.get("changed_files", 0),
+                    "additions": pr.get("additions", 0),
+                    "deletions": pr.get("deletions", 0),
+                    "description": (pr.get("body") or "")[:3000],
+                }
+            )
 
         if found_old or len(items) < MAX_PER_PAGE:
             break
@@ -156,18 +161,23 @@ async def _fetch_reviews(
         for r in items:
             body = (r.get("body") or "").strip()
             if body:
-                node_id = r.get("node_id", "") or hashlib.sha256(
-                    f"{repo}:{pr_number}:review:{r.get('id','')}".encode()
-                ).hexdigest()[:40]
-                reviews.append({
-                    "reviewer": r["user"]["login"],
-                    "body": body,
-                    "review_state": r.get("state", ""),
-                    "created_at": r.get("submitted_at", ""),
-                    "file_path": "",
-                    "line_number": 0,
-                    "node_id": node_id,
-                })
+                node_id = (
+                    r.get("node_id", "")
+                    or hashlib.sha256(
+                        f"{repo}:{pr_number}:review:{r.get('id', '')}".encode()
+                    ).hexdigest()[:40]
+                )
+                reviews.append(
+                    {
+                        "reviewer": r["user"]["login"],
+                        "body": body,
+                        "review_state": r.get("state", ""),
+                        "created_at": r.get("submitted_at", ""),
+                        "file_path": "",
+                        "line_number": 0,
+                        "node_id": node_id,
+                    }
+                )
         if len(items) < MAX_PER_PAGE:
             break
         page += 1
@@ -202,18 +212,23 @@ async def _fetch_review_comments(
             user = c.get("user", {})
             if user.get("type") == "Bot":
                 continue
-            node_id = c.get("node_id", "") or hashlib.sha256(
-                f"{repo}:{pr_number}:{c.get('id','')}".encode()
-            ).hexdigest()[:40]
-            comments.append({
-                "reviewer": user.get("login", ""),
-                "body": body,
-                "review_state": "",
-                "created_at": c.get("created_at", ""),
-                "file_path": c.get("path", ""),
-                "line_number": c.get("original_line") or c.get("line") or 0,
-                "node_id": node_id,
-            })
+            node_id = (
+                c.get("node_id", "")
+                or hashlib.sha256(
+                    f"{repo}:{pr_number}:{c.get('id', '')}".encode()
+                ).hexdigest()[:40]
+            )
+            comments.append(
+                {
+                    "reviewer": user.get("login", ""),
+                    "body": body,
+                    "review_state": "",
+                    "created_at": c.get("created_at", ""),
+                    "file_path": c.get("path", ""),
+                    "line_number": c.get("original_line") or c.get("line") or 0,
+                    "node_id": node_id,
+                }
+            )
         if len(items) < MAX_PER_PAGE:
             break
         page += 1
@@ -276,9 +291,15 @@ async def collect_repo(
             await asyncio.sleep(0.3)
 
             if all_comments:
-                node_ids = [c.get("node_id", "") for c in all_comments if c.get("node_id")]
-                existing_ids = await comment_node_ids_exist(node_ids) if node_ids else set()
-                new_comments = [c for c in all_comments if c.get("node_id", "") not in existing_ids]
+                node_ids = [
+                    c.get("node_id", "") for c in all_comments if c.get("node_id")
+                ]
+                existing_ids = (
+                    await comment_node_ids_exist(node_ids) if node_ids else set()
+                )
+                new_comments = [
+                    c for c in all_comments if c.get("node_id", "") not in existing_ids
+                ]
                 inserted = await bulk_insert_ri_comments(new_comments)
                 stats["comments"] += inserted
                 stats["skipped"] += len(all_comments) - len(new_comments)
@@ -292,12 +313,18 @@ async def collect_repo(
                 remaining = await _check_rate_limit(client)
                 logger.info(
                     "  %s: %d/%d PRs processed, %d comments, %d API calls remaining",
-                    repo, i + 1, len(prs), stats["comments"], remaining,
+                    repo,
+                    i + 1,
+                    len(prs),
+                    stats["comments"],
+                    remaining,
                 )
 
     logger.info(
         "Collection complete for %s: %d PRs, %d comments",
-        repo, stats["prs"], stats["comments"],
+        repo,
+        stats["prs"],
+        stats["comments"],
     )
     return stats
 
@@ -313,7 +340,9 @@ async def collect_all(
 
     for repo in target_repos:
         try:
-            stats = await collect_repo(repo, since=since, progress_callback=progress_callback)
+            stats = await collect_repo(
+                repo, since=since, progress_callback=progress_callback
+            )
             all_stats.append(stats)
         except Exception:
             logger.exception("Failed to collect reviews for %s", repo)
@@ -324,6 +353,8 @@ async def collect_all(
     total_comments = sum(s.get("comments", 0) for s in all_stats)
     logger.info(
         "Collection complete: %d repos, %d PRs, %d comments",
-        len(all_stats), total_prs, total_comments,
+        len(all_stats),
+        total_prs,
+        total_comments,
     )
     return all_stats

@@ -1,4 +1,5 @@
 """CRUD helpers for Review Intelligence (ri_*) tables."""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ async def _get_db() -> aiosqlite.Connection:
 # ---------------------------------------------------------------------------
 # ri_pull_requests
 # ---------------------------------------------------------------------------
+
 
 async def upsert_ri_pr(pr: dict) -> None:
     pr["collected_at"] = datetime.now(timezone.utc).isoformat()
@@ -102,6 +104,7 @@ async def get_latest_merged_at(repo: str) -> str | None:
 # ---------------------------------------------------------------------------
 # ri_review_comments
 # ---------------------------------------------------------------------------
+
 
 async def insert_ri_comment(comment: dict) -> None:
     db = await _get_db()
@@ -204,7 +207,9 @@ async def search_comments(query: str, repo: str = "", limit: int = 50) -> list[d
         await db.close()
 
 
-async def get_comments_by_file_path(file_path_pattern: str, limit: int = 30) -> list[dict]:
+async def get_comments_by_file_path(
+    file_path_pattern: str, limit: int = 30
+) -> list[dict]:
     db = await _get_db()
     try:
         cursor = await db.execute(
@@ -220,7 +225,9 @@ async def get_comments_by_file_path(file_path_pattern: str, limit: int = 30) -> 
         await db.close()
 
 
-async def get_comments_by_category(category: str, repo: str = "", limit: int = 50) -> list[dict]:
+async def get_comments_by_category(
+    category: str, repo: str = "", limit: int = 50
+) -> list[dict]:
     db = await _get_db()
     try:
         repo_filter = "AND p.repo = :repo" if repo else ""
@@ -282,9 +289,7 @@ async def batch_update_categories(updates: list[tuple[int, str]]) -> int:
 async def count_ri_comments() -> dict:
     db = await _get_db()
     try:
-        cursor = await db.execute(
-            "SELECT COUNT(*) as cnt FROM ri_review_comments"
-        )
+        cursor = await db.execute("SELECT COUNT(*) as cnt FROM ri_review_comments")
         row = await cursor.fetchone()
         total = row["cnt"] if row else 0
 
@@ -308,6 +313,7 @@ async def count_ri_comments() -> dict:
 # ---------------------------------------------------------------------------
 # ri_patterns
 # ---------------------------------------------------------------------------
+
 
 async def upsert_ri_pattern(pattern: dict) -> None:
     pattern["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -335,7 +341,9 @@ async def clear_ri_patterns() -> None:
         await db.close()
 
 
-async def get_patterns(category: str = "", repo: str = "", limit: int = 50) -> list[dict]:
+async def get_patterns(
+    category: str = "", repo: str = "", limit: int = 50
+) -> list[dict]:
     db = await _get_db()
     try:
         conditions = []
@@ -360,6 +368,7 @@ async def get_patterns(category: str = "", repo: str = "", limit: int = 50) -> l
 # ---------------------------------------------------------------------------
 # ri_reviewer_profiles
 # ---------------------------------------------------------------------------
+
 
 async def upsert_reviewer_profile(profile: dict) -> None:
     profile["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -438,6 +447,7 @@ async def get_all_reviewer_profiles() -> list[dict]:
 # Aggregate statistics
 # ---------------------------------------------------------------------------
 
+
 async def get_ri_statistics() -> dict:
     """Combined statistics for the Review Intelligence dashboard."""
     pr_counts = await count_ri_prs()
@@ -468,6 +478,7 @@ async def get_ri_statistics() -> dict:
 # Repo-scoped queries for per-repo intelligence display
 # ---------------------------------------------------------------------------
 
+
 async def get_repo_intelligence(repo: str) -> dict:
     """Return complete intelligence data for a single repo."""
     db = await _get_db()
@@ -497,7 +508,10 @@ async def get_repo_intelligence(repo: str) -> dict:
                GROUP BY c.reviewer ORDER BY cnt DESC LIMIT 10""",
             {"repo": repo},
         )
-        reviewers = [{"reviewer": r["reviewer"], "comments": r["cnt"]} for r in await cursor.fetchall()]
+        reviewers = [
+            {"reviewer": r["reviewer"], "comments": r["cnt"]}
+            for r in await cursor.fetchall()
+        ]
 
         cursor = await db.execute(
             "SELECT * FROM ri_patterns WHERE repo = :repo ORDER BY frequency DESC LIMIT 20",
@@ -521,7 +535,9 @@ async def get_repo_intelligence(repo: str) -> dict:
             {"repo": repo},
         )
         row = await cursor.fetchone()
-        date_range = {"earliest": row["earliest"], "latest": row["latest"]} if row else {}
+        date_range = (
+            {"earliest": row["earliest"], "latest": row["latest"]} if row else {}
+        )
 
         return {
             "repo": repo,
@@ -558,13 +574,15 @@ async def get_collected_repos() -> list[dict]:
                 {"repo": repo},
             )
             row2 = await cursor2.fetchone()
-            result.append({
-                "repo": repo,
-                "pr_count": r["pr_count"],
-                "comment_count": row2["cnt"] if row2 else 0,
-                "earliest": r["earliest"],
-                "latest": r["latest"],
-            })
+            result.append(
+                {
+                    "repo": repo,
+                    "pr_count": r["pr_count"],
+                    "comment_count": row2["cnt"] if row2 else 0,
+                    "earliest": r["earliest"],
+                    "latest": r["latest"],
+                }
+            )
         return result
     finally:
         await db.close()

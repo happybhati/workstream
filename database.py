@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import aiosqlite
-from pathlib import Path
 
 from config import settings
 
@@ -215,24 +214,36 @@ async def init_db() -> None:
             cursor = await db.execute(f"PRAGMA table_info({table})")
             cols = {row[1] for row in await cursor.fetchall()}
             if "polled_at" not in cols:
-                await db.execute(f"ALTER TABLE {table} ADD COLUMN polled_at TEXT DEFAULT ''")
+                await db.execute(
+                    f"ALTER TABLE {table} ADD COLUMN polled_at TEXT DEFAULT ''"
+                )
         cursor = await db.execute("PRAGMA table_info(pull_requests)")
         pr_cols = {row[1] for row in await cursor.fetchall()}
         if "ci_checks" not in pr_cols:
-            await db.execute("ALTER TABLE pull_requests ADD COLUMN ci_checks TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE pull_requests ADD COLUMN ci_checks TEXT DEFAULT ''"
+            )
         if "author_avatar" not in pr_cols:
-            await db.execute("ALTER TABLE pull_requests ADD COLUMN author_avatar TEXT DEFAULT ''")
+            await db.execute(
+                "ALTER TABLE pull_requests ADD COLUMN author_avatar TEXT DEFAULT ''"
+            )
         # node_id for comment deduplication
         cursor = await db.execute("PRAGMA table_info(ri_review_comments)")
         ri_cols = {row[1] for row in await cursor.fetchall()}
         if "node_id" not in ri_cols:
-            await db.execute("ALTER TABLE ri_review_comments ADD COLUMN node_id TEXT DEFAULT ''")
-            await db.execute("CREATE INDEX IF NOT EXISTS idx_ri_comment_node_id ON ri_review_comments(node_id)")
+            await db.execute(
+                "ALTER TABLE ri_review_comments ADD COLUMN node_id TEXT DEFAULT ''"
+            )
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ri_comment_node_id ON ri_review_comments(node_id)"
+            )
         # score_security column for readiness scans
         cursor = await db.execute("PRAGMA table_info(readiness_scans)")
         rs_cols = {row[1] for row in await cursor.fetchall()}
         if "score_security" not in rs_cols:
-            await db.execute("ALTER TABLE readiness_scans ADD COLUMN score_security INTEGER DEFAULT 0")
+            await db.execute(
+                "ALTER TABLE readiness_scans ADD COLUMN score_security INTEGER DEFAULT 0"
+            )
         await db.commit()
     finally:
         await db.close()
@@ -240,6 +251,7 @@ async def init_db() -> None:
 
 async def upsert_pr(pr: dict) -> None:
     from datetime import datetime, timezone
+
     pr.setdefault("assigned_to", "")
     pr.setdefault("review_state", "")
     pr.setdefault("approved_by", "")
@@ -295,8 +307,9 @@ async def insert_activity(activity: dict) -> None:
         await db.close()
 
 
-async def get_my_prs(username_github: str, username_gitlab: str,
-                     include_closed: bool = False) -> list[dict]:
+async def get_my_prs(
+    username_github: str, username_gitlab: str, include_closed: bool = False
+) -> list[dict]:
     db = await get_db()
     try:
         state_filter = "" if include_closed else "AND state IN ('open', 'draft')"
@@ -349,6 +362,7 @@ async def get_review_requests(username_github: str, username_gitlab: str) -> lis
 
 async def upsert_jira_issue(issue: dict) -> None:
     from datetime import datetime, timezone
+
     issue["polled_at"] = datetime.now(timezone.utc).isoformat()
     db = await get_db()
     try:
@@ -382,8 +396,9 @@ async def upsert_jira_issue(issue: dict) -> None:
         await db.close()
 
 
-async def get_jira_tasks(role_filter: str = "all", status_category: str = "all",
-                         sprint: str = "all") -> list[dict]:
+async def get_jira_tasks(
+    role_filter: str = "all", status_category: str = "all", sprint: str = "all"
+) -> list[dict]:
     db = await get_db()
     try:
         conditions = []
@@ -452,8 +467,11 @@ async def get_jira_stats() -> dict:
         await db.close()
 
 
-async def upsert_yearly_completion(year: int, completed: int, same_period: int = 0) -> None:
+async def upsert_yearly_completion(
+    year: int, completed: int, same_period: int = 0
+) -> None:
     from datetime import datetime, timezone
+
     db = await get_db()
     try:
         await db.execute(
@@ -463,8 +481,12 @@ async def upsert_yearly_completion(year: int, completed: int, same_period: int =
                    completed=excluded.completed,
                    same_period=excluded.same_period,
                    updated_at=excluded.updated_at""",
-            {"year": year, "completed": completed, "same_period": same_period,
-             "updated_at": datetime.now(timezone.utc).isoformat()},
+            {
+                "year": year,
+                "completed": completed,
+                "same_period": same_period,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
         )
         await db.commit()
     finally:
@@ -620,11 +642,16 @@ async def clear_calendar_events() -> None:
 
 
 async def get_events_for_date(target_date=None) -> list[dict]:
-    from datetime import datetime, timedelta
+    from datetime import datetime
+
     if target_date is None:
         target_date = datetime.now().date()
-    day_start = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0).isoformat()
-    day_end = datetime(target_date.year, target_date.month, target_date.day, 23, 59, 59).isoformat()
+    day_start = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0
+    ).isoformat()
+    day_end = datetime(
+        target_date.year, target_date.month, target_date.day, 23, 59, 59
+    ).isoformat()
 
     db = await get_db()
     try:
@@ -647,6 +674,7 @@ async def get_today_events() -> list[dict]:
 
 async def get_tomorrow_events() -> list[dict]:
     from datetime import datetime, timedelta
+
     tomorrow = (datetime.now() + timedelta(days=1)).date()
     return await get_events_for_date(tomorrow)
 

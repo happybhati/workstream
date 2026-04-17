@@ -4,6 +4,7 @@ Uses the GitHub API to fetch the file tree, key files, CI configuration,
 and language breakdown -- returning a structured ScanResult dict used by
 the scorer and generator.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,34 +42,73 @@ KEY_FILES = [
 ]
 
 LINTER_GLOBS = {
-    ".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.yml",
-    ".flake8", ".pylintrc", "pyproject.toml", "setup.cfg",
-    ".golangci.yml", ".golangci.yaml",
-    ".prettierrc", ".prettierrc.json", ".prettierrc.yml",
-    "biome.json", "deno.json",
-    "Makefile", "justfile",
-    ".rubocop.yml", ".stylelintrc",
+    ".eslintrc",
+    ".eslintrc.js",
+    ".eslintrc.json",
+    ".eslintrc.yml",
+    ".flake8",
+    ".pylintrc",
+    "pyproject.toml",
+    "setup.cfg",
+    ".golangci.yml",
+    ".golangci.yaml",
+    ".prettierrc",
+    ".prettierrc.json",
+    ".prettierrc.yml",
+    "biome.json",
+    "deno.json",
+    "Makefile",
+    "justfile",
+    ".rubocop.yml",
+    ".stylelintrc",
     "tslint.json",
 }
 
 DEP_FILES = {
-    "go.mod", "go.sum",
-    "package.json", "yarn.lock", "pnpm-lock.yaml", "package-lock.json",
-    "requirements.txt", "Pipfile", "poetry.lock", "pyproject.toml",
-    "Cargo.toml", "Gemfile", "build.gradle", "pom.xml",
-    "mix.exs", "composer.json",
+    "go.mod",
+    "go.sum",
+    "package.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "requirements.txt",
+    "Pipfile",
+    "poetry.lock",
+    "pyproject.toml",
+    "Cargo.toml",
+    "Gemfile",
+    "build.gradle",
+    "pom.xml",
+    "mix.exs",
+    "composer.json",
 }
 
 STRUCTURED_DIRS = {
-    "src", "pkg", "internal", "lib", "cmd", "api",
-    "app", "core", "modules", "services", "components",
+    "src",
+    "pkg",
+    "internal",
+    "lib",
+    "cmd",
+    "api",
+    "app",
+    "core",
+    "modules",
+    "services",
+    "components",
 }
 
 SECRET_PATTERNS_IN_TREE = {
-    ".env", ".env.local", ".env.production",
-    "credentials.json", "secrets.json", "secrets.yaml",
-    "service-account.json", ".npmrc", ".pypirc",
-    "id_rsa", "id_ed25519",
+    ".env",
+    ".env.local",
+    ".env.production",
+    "credentials.json",
+    "secrets.json",
+    "secrets.yaml",
+    "service-account.json",
+    ".npmrc",
+    ".pypirc",
+    "id_rsa",
+    "id_ed25519",
 }
 
 SECRET_CONTENT_RE = re.compile(
@@ -137,18 +177,33 @@ async def scan_repo(repo_url: str) -> dict:
 
     linter_files = [p for p in all_paths if p.split("/")[-1] in LINTER_GLOBS]
     dep_files_found = [p for p in all_paths if p.split("/")[-1] in DEP_FILES]
-    test_dirs = [d for d in top_dirs if d.lower() in ("test", "tests", "spec", "specs", "__tests__", "e2e", "integration-tests")]
+    test_dirs = [
+        d
+        for d in top_dirs
+        if d.lower()
+        in ("test", "tests", "spec", "specs", "__tests__", "e2e", "integration-tests")
+    ]
     if not test_dirs:
-        test_dirs = [p.split("/")[0] for p in all_paths
-                     if any(seg in p.lower() for seg in ("_test.", "_test/", "test_", "/tests/", "/spec/"))]
+        test_dirs = [
+            p.split("/")[0]
+            for p in all_paths
+            if any(
+                seg in p.lower()
+                for seg in ("_test.", "_test/", "test_", "/tests/", "/spec/")
+            )
+        ]
         test_dirs = sorted(set(test_dirs))
 
-    doc_dirs = [d for d in top_dirs if d.lower() in ("docs", "doc", "documentation", "wiki")]
+    doc_dirs = [
+        d for d in top_dirs if d.lower() in ("docs", "doc", "documentation", "wiki")
+    ]
     cursor_rules = [p for p in all_paths if p.startswith(".cursor/rules/")]
     claude_rules = [p for p in all_paths if p.startswith(".claude/rules/")]
     structured = [d for d in top_dirs if d.lower() in STRUCTURED_DIRS]
 
-    secrets_in_tree = [p for p in all_paths if p.split("/")[-1] in SECRET_PATTERNS_IN_TREE]
+    secrets_in_tree = [
+        p for p in all_paths if p.split("/")[-1] in SECRET_PATTERNS_IN_TREE
+    ]
 
     has_secrets_in_content = False
     for fname in ("README.md", ".gitignore"):
@@ -158,12 +213,18 @@ async def scan_repo(repo_url: str) -> dict:
             break
 
     gitignore = key_files.get(".gitignore", "")
-    gitignore_covers_secrets = any(
-        pat in gitignore.lower()
-        for pat in (".env", "credentials", "secrets", "*.pem", "*.key", "id_rsa")
-    ) if gitignore else False
+    gitignore_covers_secrets = (
+        any(
+            pat in gitignore.lower()
+            for pat in (".env", "credentials", "secrets", "*.pem", "*.key", "id_rsa")
+        )
+        if gitignore
+        else False
+    )
 
-    renovate_files = [p for p in all_paths if "renovate" in p.lower() and p.endswith(".json")]
+    renovate_files = [
+        p for p in all_paths if "renovate" in p.lower() and p.endswith(".json")
+    ]
     has_dependabot = bool(key_files.get(".github/dependabot.yml", ""))
     has_renovate = bool(renovate_files)
 
@@ -200,7 +261,9 @@ async def scan_repo(repo_url: str) -> dict:
 async def _fetch_metadata(client: httpx.AsyncClient, owner: str, repo: str) -> dict:
     resp = await client.get(f"/repos/{owner}/{repo}")
     if resp.status_code != 200:
-        raise RuntimeError(f"Repository not found or inaccessible: {owner}/{repo} ({resp.status_code})")
+        raise RuntimeError(
+            f"Repository not found or inaccessible: {owner}/{repo} ({resp.status_code})"
+        )
     return resp.json()
 
 
@@ -211,7 +274,9 @@ async def _fetch_languages(client: httpx.AsyncClient, owner: str, repo: str) -> 
     return resp.json()
 
 
-async def _fetch_tree(client: httpx.AsyncClient, owner: str, repo: str, branch: str) -> list[str]:
+async def _fetch_tree(
+    client: httpx.AsyncClient, owner: str, repo: str, branch: str
+) -> list[str]:
     resp = await client.get(
         f"/repos/{owner}/{repo}/git/trees/{branch}",
         params={"recursive": "1"},
@@ -220,10 +285,16 @@ async def _fetch_tree(client: httpx.AsyncClient, owner: str, repo: str, branch: 
         logger.warning("Could not fetch tree for %s/%s:%s", owner, repo, branch)
         return []
     data = resp.json()
-    return [item["path"] for item in data.get("tree", []) if item.get("type") in ("blob", "tree")]
+    return [
+        item["path"]
+        for item in data.get("tree", [])
+        if item.get("type") in ("blob", "tree")
+    ]
 
 
-async def _fetch_file(client: httpx.AsyncClient, owner: str, repo: str, path: str) -> str:
+async def _fetch_file(
+    client: httpx.AsyncClient, owner: str, repo: str, path: str
+) -> str:
     resp = await client.get(f"/repos/{owner}/{repo}/contents/{path}")
     if resp.status_code != 200:
         return ""

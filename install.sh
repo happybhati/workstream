@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 # Install Workstream as a macOS LaunchAgent service.
+# For Linux, use: bin/workstream-linux install
+# For containers: podman build -t workstream:dev . && podman-compose up
 set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "ERROR: install.sh is for macOS only (uses LaunchAgent)."
+    echo ""
+    echo "For Linux, use one of:"
+    echo "  ./bin/workstream-linux install   # systemd user service"
+    echo "  podman-compose up                # container (Fedora-based)"
+    echo ""
+    echo "For manual run on any platform:"
+    echo "  python3 -m venv venv && source venv/bin/activate"
+    echo "  pip install -r requirements.txt"
+    echo "  python -m uvicorn app:app --host 0.0.0.0 --port 8080"
+    exit 1
+fi
 
 DASHBOARD_DIR="$(cd "$(dirname "$0")" && pwd)"
 LABEL="com.workstream.dashboard"

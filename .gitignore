@@ -39,6 +39,15 @@ logs/
 *.swo
 *~
 
+# --- Container ---
+*.tar
+
+# --- Test / Coverage ---
+.coverage
+htmlcov/
+coverage.xml
+.pytest_cache/
+
 # --- Generated artifacts ---
 docs/ai_readiness_paper.zip
 docs/ai_readiness_paper.tex

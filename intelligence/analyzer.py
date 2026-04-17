@@ -3,22 +3,19 @@
 Classifies review comments into categories, builds reviewer profiles,
 and extracts recurring patterns from historical PR review data.
 """
+
 from __future__ import annotations
 
-import json
 import logging
 import re
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
 
 from intelligence.db import (
-    get_unclassified_comments,
     batch_update_categories,
-    count_ri_comments,
-    get_all_reviewer_profiles,
+    clear_ri_patterns,
+    get_unclassified_comments,
     upsert_reviewer_profile,
     upsert_ri_pattern,
-    clear_ri_patterns,
 )
 
 logger = logging.getLogger("dashboard.intelligence.analyzer")
@@ -28,45 +25,72 @@ logger = logging.getLogger("dashboard.intelligence.analyzer")
 # ---------------------------------------------------------------------------
 
 CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
-    ("bug", re.compile(
-        r"(?i)\b(bug|incorrect|wrong|broken|crash|panic|nil\s*pointer|null\s*pointer"
-        r"|nil\s+check|off.by.one|logic\s+error|typo\s+in\s+logic|data\s*loss"
-        r"|infinite\s+loop|deadlock|segfault|undefined\s+behavior)\b"
-    )),
-    ("security", re.compile(
-        r"(?i)\b(secur|vulnerab|inject|xss|csrf|auth[oz]|permission|privilege"
-        r"|secret|credential|token\s+leak|sanitiz|escap|taint|CVE)\b"
-    )),
-    ("error_handling", re.compile(
-        r"(?i)\b(error\s+handling|handle\s+error|unhandled|unchecked\s+(error|return)"
-        r"|err\s*!=\s*nil|missing\s+error|swallow|ignore.*error|error\s+propagat"
-        r"|wrap\s+error|return\s+err|fmt\.Errorf)\b"
-    )),
-    ("testing", re.compile(
-        r"(?i)\b(test|coverage|assert|mock|fixture|unit\s*test|e2e|integration\s*test"
-        r"|test\s*case|test\s*file|_test\.go|_test\.py|spec\.|describe\(|it\()\b"
-    )),
-    ("performance", re.compile(
-        r"(?i)\b(perform|slow|latenc|efficien|optimi|allocat|memory\s+leak|O\(n"
-        r"|complex|bottleneck|cache|pool|batch|concurrent|parallel|goroutine\s+leak)\b"
-    )),
-    ("concurrency", re.compile(
-        r"(?i)\b(race\s+condition|mutex|lock|sync\.|atomic|channel|goroutine|thread"
-        r"|concurrent|parallel|deadlock|wait\s*group|context\s+cancel)\b"
-    )),
-    ("api_design", re.compile(
-        r"(?i)\b(api|endpoint|backward.compat|breaking\s+change|contract|interface"
-        r"|signature|deprecat|versioning|schema\s+change|field\s+name|response\s+format)\b"
-    )),
-    ("documentation", re.compile(
-        r"(?i)\b(doc|comment|readme|godoc|docstring|explain|clarif|description"
-        r"|// |\/\*|TODO|FIXME|HACK|NOQA)\b"
-    )),
-    ("architecture", re.compile(
-        r"(?i)\b(architect|design\s+pattern|separation|coupling|cohesion|abstraction"
-        r"|refactor|restructur|modulari|dependency|layer|component|encapsulat"
-        r"|single\s+responsibility)\b"
-    )),
+    (
+        "bug",
+        re.compile(
+            r"(?i)\b(bug|incorrect|wrong|broken|crash|panic|nil\s*pointer|null\s*pointer"
+            r"|nil\s+check|off.by.one|logic\s+error|typo\s+in\s+logic|data\s*loss"
+            r"|infinite\s+loop|deadlock|segfault|undefined\s+behavior)\b"
+        ),
+    ),
+    (
+        "security",
+        re.compile(
+            r"(?i)\b(secur|vulnerab|inject|xss|csrf|auth[oz]|permission|privilege"
+            r"|secret|credential|token\s+leak|sanitiz|escap|taint|CVE)\b"
+        ),
+    ),
+    (
+        "error_handling",
+        re.compile(
+            r"(?i)\b(error\s+handling|handle\s+error|unhandled|unchecked\s+(error|return)"
+            r"|err\s*!=\s*nil|missing\s+error|swallow|ignore.*error|error\s+propagat"
+            r"|wrap\s+error|return\s+err|fmt\.Errorf)\b"
+        ),
+    ),
+    (
+        "testing",
+        re.compile(
+            r"(?i)\b(test|coverage|assert|mock|fixture|unit\s*test|e2e|integration\s*test"
+            r"|test\s*case|test\s*file|_test\.go|_test\.py|spec\.|describe\(|it\()\b"
+        ),
+    ),
+    (
+        "performance",
+        re.compile(
+            r"(?i)\b(perform|slow|latenc|efficien|optimi|allocat|memory\s+leak|O\(n"
+            r"|complex|bottleneck|cache|pool|batch|concurrent|parallel|goroutine\s+leak)\b"
+        ),
+    ),
+    (
+        "concurrency",
+        re.compile(
+            r"(?i)\b(race\s+condition|mutex|lock|sync\.|atomic|channel|goroutine|thread"
+            r"|concurrent|parallel|deadlock|wait\s*group|context\s+cancel)\b"
+        ),
+    ),
+    (
+        "api_design",
+        re.compile(
+            r"(?i)\b(api|endpoint|backward.compat|breaking\s+change|contract|interface"
+            r"|signature|deprecat|versioning|schema\s+change|field\s+name|response\s+format)\b"
+        ),
+    ),
+    (
+        "documentation",
+        re.compile(
+            r"(?i)\b(doc|comment|readme|godoc|docstring|explain|clarif|description"
+            r"|// |\/\*|TODO|FIXME|HACK|NOQA)\b"
+        ),
+    ),
+    (
+        "architecture",
+        re.compile(
+            r"(?i)\b(architect|design\s+pattern|separation|coupling|cohesion|abstraction"
+            r"|refactor|restructur|modulari|dependency|layer|component|encapsulat"
+            r"|single\s+responsibility)\b"
+        ),
+    ),
 ]
 
 MIN_COMMENT_LENGTH = 15
@@ -114,19 +138,92 @@ async def classify_all_comments() -> dict:
 # Reviewer profiling
 # ---------------------------------------------------------------------------
 
+
 def _extract_phrases(comments: list[dict], top_n: int = 10) -> list[str]:
     """Extract frequently occurring multi-word phrases from comment bodies."""
     phrase_counter: Counter = Counter()
     stop_words = {
-        "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-        "have", "has", "had", "do", "does", "did", "will", "would", "could",
-        "should", "may", "might", "can", "shall", "this", "that", "these",
-        "those", "it", "its", "i", "you", "we", "they", "he", "she", "my",
-        "your", "our", "their", "in", "on", "at", "to", "for", "of", "with",
-        "by", "from", "up", "about", "into", "through", "during", "before",
-        "after", "and", "but", "or", "nor", "not", "no", "so", "if", "then",
-        "than", "too", "very", "just", "also", "as", "here", "there", "what",
-        "which", "who", "whom", "how", "when", "where", "why",
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "can",
+        "shall",
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "its",
+        "i",
+        "you",
+        "we",
+        "they",
+        "he",
+        "she",
+        "my",
+        "your",
+        "our",
+        "their",
+        "in",
+        "on",
+        "at",
+        "to",
+        "for",
+        "of",
+        "with",
+        "by",
+        "from",
+        "up",
+        "about",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "and",
+        "but",
+        "or",
+        "nor",
+        "not",
+        "no",
+        "so",
+        "if",
+        "then",
+        "than",
+        "too",
+        "very",
+        "just",
+        "also",
+        "as",
+        "here",
+        "there",
+        "what",
+        "which",
+        "who",
+        "whom",
+        "how",
+        "when",
+        "where",
+        "why",
     }
 
     for c in comments:
@@ -164,12 +261,14 @@ async def build_reviewer_profiles() -> int:
     finally:
         await db.close()
 
-    reviewer_data: dict[str, dict] = defaultdict(lambda: {
-        "total_prs": 0,
-        "total_comments": 0,
-        "categories": Counter(),
-        "pr_ids": set(),
-    })
+    reviewer_data: dict[str, dict] = defaultdict(
+        lambda: {
+            "total_prs": 0,
+            "total_comments": 0,
+            "categories": Counter(),
+            "pr_ids": set(),
+        }
+    )
 
     for row in rows:
         r = row["reviewer"]
@@ -215,15 +314,17 @@ async def build_reviewer_profiles() -> int:
 
         avg_per_pr = total_comments / total_prs if total_prs > 0 else 0
 
-        await upsert_reviewer_profile({
-            "reviewer": reviewer,
-            "total_reviews": total_prs,
-            "total_comments": total_comments,
-            "top_categories": top_cats,
-            "common_phrases": common_phrases,
-            "avg_comments_per_pr": round(avg_per_pr, 2),
-            "focus_areas": focus,
-        })
+        await upsert_reviewer_profile(
+            {
+                "reviewer": reviewer,
+                "total_reviews": total_prs,
+                "total_comments": total_comments,
+                "top_categories": top_cats,
+                "common_phrases": common_phrases,
+                "avg_comments_per_pr": round(avg_per_pr, 2),
+                "focus_areas": focus,
+            }
+        )
         profiles_count += 1
 
     logger.info("Built %d reviewer profiles", profiles_count)
@@ -233,6 +334,7 @@ async def build_reviewer_profiles() -> int:
 # ---------------------------------------------------------------------------
 # Pattern extraction
 # ---------------------------------------------------------------------------
+
 
 async def extract_patterns() -> int:
     """Extract recurring review patterns from classified comments.
@@ -273,14 +375,16 @@ async def extract_patterns() -> int:
 
         pattern_desc = _summarize_pattern(category, bodies)
 
-        await upsert_ri_pattern({
-            "category": category,
-            "pattern": pattern_desc,
-            "example_comment": best_example[:1000],
-            "frequency": len(bodies),
-            "reviewer": reviewer,
-            "repo": repo,
-        })
+        await upsert_ri_pattern(
+            {
+                "category": category,
+                "pattern": pattern_desc,
+                "example_comment": best_example[:1000],
+                "frequency": len(bodies),
+                "reviewer": reviewer,
+                "repo": repo,
+            }
+        )
         pattern_count += 1
 
     logger.info("Extracted %d patterns", pattern_count)
@@ -298,10 +402,36 @@ def _summarize_pattern(category: str, bodies: list[str]) -> str:
         key_words.update(words)
 
     stop = {
-        "this", "that", "with", "from", "have", "will", "should", "could",
-        "would", "been", "being", "were", "also", "just", "like", "need",
-        "needs", "here", "there", "think", "make", "more", "some", "when",
-        "then", "than", "what", "which", "where", "does",
+        "this",
+        "that",
+        "with",
+        "from",
+        "have",
+        "will",
+        "should",
+        "could",
+        "would",
+        "been",
+        "being",
+        "were",
+        "also",
+        "just",
+        "like",
+        "need",
+        "needs",
+        "here",
+        "there",
+        "think",
+        "make",
+        "more",
+        "some",
+        "when",
+        "then",
+        "than",
+        "what",
+        "which",
+        "where",
+        "does",
     }
     top = [w for w, _ in key_words.most_common(20) if w not in stop][:5]
 
@@ -324,6 +454,7 @@ def _summarize_pattern(category: str, bodies: list[str]) -> str:
 # ---------------------------------------------------------------------------
 # Full analysis pipeline
 # ---------------------------------------------------------------------------
+
 
 async def run_full_analysis() -> dict:
     """Run the complete analysis pipeline: classify -> profile -> extract.
@@ -351,6 +482,7 @@ async def run_full_analysis() -> dict:
 # ---------------------------------------------------------------------------
 # Tool-specific insight generation
 # ---------------------------------------------------------------------------
+
 
 async def generate_tool_insights(repo: str) -> dict:
     """Convert collected patterns and profiles into tool-specific guidance.

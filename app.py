@@ -14,15 +14,27 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import (
-    init_db, get_my_prs, get_assigned_prs, get_review_requests,
-    get_recent_activities, get_jira_tasks, get_jira_stats,
-    get_active_sprints, get_sprint_tasks, get_yearly_completions,
-    get_today_events, get_tomorrow_events,
+    get_active_sprints,
+    get_assigned_prs,
+    get_jira_stats,
+    get_jira_tasks,
+    get_my_prs,
+    get_recent_activities,
+    get_review_requests,
+    get_sprint_tasks,
+    get_today_events,
+    get_tomorrow_events,
+    get_yearly_completions,
+    init_db,
 )
 from pollers import poll_all
 from reviewer import (
-    get_available_providers, review_pr, post_review,
-    fetch_pr_diff, sanitize_diff, build_review_prompt,
+    build_review_prompt,
+    fetch_pr_diff,
+    get_available_providers,
+    post_review,
+    review_pr,
+    sanitize_diff,
 )
 
 LOG_DIR = settings.log_dir
@@ -50,14 +62,30 @@ poll_task: asyncio.Task | None = None
 
 async def _poll_loop() -> None:
     from agents.activity_stream import emit_event
+
     while True:
         try:
-            emit_event("tool_start", "workstream", category="operation", data={"tool": "poll_all"})
+            emit_event(
+                "tool_start",
+                "workstream",
+                category="operation",
+                data={"tool": "poll_all"},
+            )
             await poll_all()
-            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "success"})
+            emit_event(
+                "tool_end",
+                "workstream",
+                category="operation",
+                data={"tool": "poll_all", "status": "success"},
+            )
         except Exception:
             logger.exception("Poll loop error")
-            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "error"})
+            emit_event(
+                "tool_end",
+                "workstream",
+                category="operation",
+                data={"tool": "poll_all", "status": "error"},
+            )
         await asyncio.sleep(settings.poll_interval_seconds)
 
 
@@ -89,14 +117,22 @@ async def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 
+@app.get("/api/health")
+async def api_health():
+    """Health check endpoint for container orchestration and monitoring."""
+    return JSONResponse({"status": "ok"})
+
+
 @app.get("/api/config")
 async def api_config():
     """Expose non-secret configuration to the frontend."""
-    return JSONResponse({
-        "jira_url": settings.jira_url,
-        "jira_board_projects": settings.jira_board_projects,
-        "display_name": settings.display_name,
-    })
+    return JSONResponse(
+        {
+            "jira_url": settings.jira_url,
+            "jira_board_projects": settings.jira_board_projects,
+            "display_name": settings.display_name,
+        }
+    )
 
 
 @app.get("/api/my-prs")
@@ -125,7 +161,9 @@ async def api_activity():
 
 @app.get("/api/jira-tasks")
 async def api_jira_tasks(role: str = "all", status: str = "all", sprint: str = "all"):
-    tasks = await get_jira_tasks(role_filter=role, status_category=status, sprint=sprint)
+    tasks = await get_jira_tasks(
+        role_filter=role, status_category=status, sprint=sprint
+    )
     return JSONResponse(tasks)
 
 
@@ -149,17 +187,25 @@ async def api_sprint_info():
         matching = [sp for sp in sprints if sp["sprint_id"] == sid]
         projects = [sp["project"] for sp in matching]
         boards = {sp["project"]: sp["board_id"] for sp in matching}
-        merged_tasks = {"new": 0, "in_progress": 0, "in_review": 0, "done": 0, "total": 0}
+        merged_tasks = {
+            "new": 0,
+            "in_progress": 0,
+            "in_review": 0,
+            "done": 0,
+            "total": 0,
+        }
         for proj in projects:
             t = await get_sprint_tasks(proj)
             for k in merged_tasks:
                 merged_tasks[k] += t.get(k, 0)
-        result.append({
-            **s,
-            "projects": projects,
-            "boards": boards,
-            "my_tasks": merged_tasks,
-        })
+        result.append(
+            {
+                **s,
+                "projects": projects,
+                "boards": boards,
+                "my_tasks": merged_tasks,
+            }
+        )
     return JSONResponse(result)
 
 
@@ -189,26 +235,38 @@ async def api_refresh():
 
 @app.get("/api/stats")
 async def api_stats():
-    all_my_prs = await get_my_prs(settings.github_username, settings.gitlab_username, include_closed=True)
-    assigned = await get_assigned_prs(settings.github_username, settings.gitlab_username)
-    reviews = await get_review_requests(settings.github_username, settings.gitlab_username)
+    all_my_prs = await get_my_prs(
+        settings.github_username, settings.gitlab_username, include_closed=True
+    )
+    assigned = await get_assigned_prs(
+        settings.github_username, settings.gitlab_username
+    )
+    reviews = await get_review_requests(
+        settings.github_username, settings.gitlab_username
+    )
     jira = await get_jira_stats()
 
     open_count = sum(1 for p in all_my_prs if p["state"] in ("open", "draft"))
     merged_count = sum(1 for p in all_my_prs if p["state"] == "merged")
     draft_count = sum(1 for p in all_my_prs if p["is_draft"] and p["state"] == "draft")
-    ci_failing = sum(1 for p in all_my_prs if p["ci_status"] == "failing" and p["state"] in ("open", "draft"))
+    ci_failing = sum(
+        1
+        for p in all_my_prs
+        if p["ci_status"] == "failing" and p["state"] in ("open", "draft")
+    )
 
-    return JSONResponse({
-        "open_prs": open_count,
-        "merged_prs": merged_count,
-        "draft_prs": draft_count,
-        "ci_failing": ci_failing,
-        "assigned_prs": len(assigned),
-        "pending_reviews": len(reviews),
-        "jira_tasks": jira.get("total", 0),
-        "jira_in_sprint": jira.get("in_sprint", 0),
-    })
+    return JSONResponse(
+        {
+            "open_prs": open_count,
+            "merged_prs": merged_count,
+            "draft_prs": draft_count,
+            "ci_failing": ci_failing,
+            "assigned_prs": len(assigned),
+            "pending_reviews": len(reviews),
+            "jira_tasks": jira.get("total", 0),
+            "jira_in_sprint": jira.get("in_sprint", 0),
+        }
+    )
 
 
 @app.get("/api/review/providers")
@@ -241,7 +299,9 @@ async def api_review(request: Request):
     pr_id = body.get("pr_id", "")
     provider = body.get("provider", "")
     if not pr_id or not provider:
-        return JSONResponse({"error": "pr_id and provider are required"}, status_code=400)
+        return JSONResponse(
+            {"error": "pr_id and provider are required"}, status_code=400
+        )
     try:
         result = await review_pr(pr_id, provider)
         return JSONResponse(result)
@@ -256,7 +316,9 @@ async def api_review_post(request: Request):
     pr_id = body.get("pr_id", "")
     comments = body.get("comments", [])
     if not pr_id or not comments:
-        return JSONResponse({"error": "pr_id and comments are required"}, status_code=400)
+        return JSONResponse(
+            {"error": "pr_id and comments are required"}, status_code=400
+        )
     try:
         result = await post_review(pr_id, comments)
         return JSONResponse(result)
@@ -269,13 +331,15 @@ async def api_review_post(request: Request):
 # AI Readiness endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.post("/api/readiness/scan")
 async def api_readiness_scan(request: Request):
     """Scan a GitHub repo for AI/agentic readiness and return score."""
+    import json
+
     from agentic_readiness.scanner import scan_repo
     from agentic_readiness.scorer import score_repo
     from database import insert_readiness_scan
-    import json
 
     body = await request.json()
     repo_url = body.get("repo_url", "").strip()
@@ -285,34 +349,44 @@ async def api_readiness_scan(request: Request):
         scan_result = await scan_repo(repo_url)
         score_result = score_repo(scan_result)
 
-        await insert_readiness_scan({
-            "repo_url": repo_url,
-            "owner": scan_result["owner"],
-            "repo": scan_result["repo"],
-            "score_total": score_result["total"],
-            "score_agent_config": score_result["categories"]["agent_config"]["score"],
-            "score_documentation": score_result["categories"]["documentation"]["score"],
-            "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
-            "score_code_structure": score_result["categories"]["code_structure"]["score"],
-            "score_security": score_result["categories"]["security"]["score"],
-            "grade": score_result["grade"],
-            "findings": json.dumps(score_result),
-            "scanned_at": scan_result["scanned_at"],
-        })
+        await insert_readiness_scan(
+            {
+                "repo_url": repo_url,
+                "owner": scan_result["owner"],
+                "repo": scan_result["repo"],
+                "score_total": score_result["total"],
+                "score_agent_config": score_result["categories"]["agent_config"][
+                    "score"
+                ],
+                "score_documentation": score_result["categories"]["documentation"][
+                    "score"
+                ],
+                "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
+                "score_code_structure": score_result["categories"]["code_structure"][
+                    "score"
+                ],
+                "score_security": score_result["categories"]["security"]["score"],
+                "grade": score_result["grade"],
+                "findings": json.dumps(score_result),
+                "scanned_at": scan_result["scanned_at"],
+            }
+        )
 
-        return JSONResponse({
-            "scan": {
-                "full_name": scan_result["full_name"],
-                "description": scan_result["description"],
-                "primary_language": scan_result["primary_language"],
-                "languages": scan_result["languages"],
-                "default_branch": scan_result["default_branch"],
-                "visibility": scan_result["visibility"],
-                "has_ci": scan_result["has_ci"],
-                "ci_workflows": scan_result["ci_workflows"],
-            },
-            "score": score_result,
-        })
+        return JSONResponse(
+            {
+                "scan": {
+                    "full_name": scan_result["full_name"],
+                    "description": scan_result["description"],
+                    "primary_language": scan_result["primary_language"],
+                    "languages": scan_result["languages"],
+                    "default_branch": scan_result["default_branch"],
+                    "visibility": scan_result["visibility"],
+                    "has_ci": scan_result["has_ci"],
+                    "ci_workflows": scan_result["ci_workflows"],
+                },
+                "score": score_result,
+            }
+        )
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     except Exception as exc:
@@ -323,9 +397,9 @@ async def api_readiness_scan(request: Request):
 @app.post("/api/readiness/generate")
 async def api_readiness_generate(request: Request):
     """Generate AI-ready files for a repo based on scan."""
+    from agentic_readiness.generator import generate_files
     from agentic_readiness.scanner import scan_repo
     from agentic_readiness.scorer import score_repo
-    from agentic_readiness.generator import generate_files
 
     body = await request.json()
     repo_url = body.get("repo_url", "").strip()
@@ -344,15 +418,17 @@ async def api_readiness_generate(request: Request):
 @app.post("/api/readiness/create-pr")
 async def api_readiness_create_pr(request: Request):
     """Create a draft PR with generated AI-readiness files."""
-    from agentic_readiness.scanner import parse_repo_url
     from agentic_readiness.generator import create_draft_pr
+    from agentic_readiness.scanner import parse_repo_url
 
     body = await request.json()
     repo_url = body.get("repo_url", "").strip()
     files = body.get("files", {})
     branch = body.get("branch", "add-ai-readiness-files")
     if not repo_url or not files:
-        return JSONResponse({"error": "repo_url and files are required"}, status_code=400)
+        return JSONResponse(
+            {"error": "repo_url and files are required"}, status_code=400
+        )
     try:
         owner, repo = parse_repo_url(repo_url)
         result = await create_draft_pr(owner, repo, files, branch_name=branch)
@@ -368,6 +444,7 @@ async def api_readiness_create_pr(request: Request):
 async def api_readiness_history():
     """Return recent scan history."""
     from database import get_readiness_history
+
     rows = await get_readiness_history()
     return JSONResponse(rows)
 
@@ -375,6 +452,7 @@ async def api_readiness_history():
 @app.get("/api/intelligence/stats")
 async def api_intelligence_stats():
     from intelligence.db import get_ri_statistics
+
     stats = await get_ri_statistics()
     return JSONResponse(stats)
 
@@ -382,6 +460,7 @@ async def api_intelligence_stats():
 @app.get("/api/intelligence/patterns")
 async def api_intelligence_patterns(category: str = "", repo: str = ""):
     from intelligence.db import get_patterns
+
     patterns = await get_patterns(category=category, repo=repo)
     return JSONResponse(patterns)
 
@@ -389,6 +468,7 @@ async def api_intelligence_patterns(category: str = "", repo: str = ""):
 @app.get("/api/intelligence/reviewers")
 async def api_intelligence_reviewers():
     from intelligence.db import get_all_reviewer_profiles
+
     profiles = await get_all_reviewer_profiles()
     return JSONResponse(profiles)
 
@@ -402,8 +482,8 @@ _intel_tasks: dict[str, dict] = {}
 
 async def _run_intel_collection(task_id: str, repo_slug: str):
     """Background coroutine for intelligence collection + analysis."""
+    from intelligence.analyzer import generate_tool_insights, run_full_analysis
     from intelligence.collector import collect_repo
-    from intelligence.analyzer import run_full_analysis, generate_tool_insights
 
     task = _intel_tasks[task_id]
     try:
@@ -447,8 +527,9 @@ async def _run_intel_collection(task_id: str, repo_slug: str):
 @app.post("/api/intelligence/collect")
 async def api_intelligence_collect(request: Request):
     """Start background collection for any GitHub repo."""
-    from intelligence.collector import parse_repo_url
     import uuid
+
+    from intelligence.collector import parse_repo_url
 
     body = await request.json()
     repo_url = body.get("repo_url", "").strip()
@@ -490,8 +571,8 @@ async def api_intelligence_progress(task_id: str):
 @app.get("/api/intelligence/repo/{owner}/{repo}")
 async def api_intelligence_repo(owner: str, repo: str):
     """Return full intelligence data for a specific repo."""
-    from intelligence.db import get_repo_intelligence
     from intelligence.analyzer import generate_tool_insights
+    from intelligence.db import get_repo_intelligence
 
     repo_slug = f"{owner}/{repo}"
     intel = await get_repo_intelligence(repo_slug)
@@ -507,6 +588,7 @@ async def api_intelligence_repo(owner: str, repo: str):
 async def api_intelligence_repos():
     """Return list of repos with collection stats."""
     from intelligence.db import get_collected_repos
+
     repos = await get_collected_repos()
     return JSONResponse(repos)
 
@@ -515,24 +597,39 @@ async def api_intelligence_repos():
 # Agents Dashboard endpoints
 # ---------------------------------------------------------------------------
 
+
 @app.get("/api/agents")
 async def api_agents():
     """Return all discovered agents with current status."""
     from agents.registry import get_all_agents
+
     return JSONResponse(get_all_agents())
 
 
 @app.post("/api/agents/refresh")
 async def api_agents_refresh():
     """Re-scan MCP config, check health, return updated list."""
-    from agents.registry import refresh_registry
     from agents.activity_stream import emit_event
-    emit_event("tool_start", "agent-registry", category="operation", data={"tool": "refresh_registry"})
+    from agents.registry import refresh_registry
+
+    emit_event(
+        "tool_start",
+        "agent-registry",
+        category="operation",
+        data={"tool": "refresh_registry"},
+    )
     agents = await refresh_registry()
     running = sum(1 for a in agents if a.get("status") == "running")
-    emit_event("tool_end", "agent-registry", category="operation", data={
-        "tool": "refresh_registry", "total": len(agents), "running": running,
-    })
+    emit_event(
+        "tool_end",
+        "agent-registry",
+        category="operation",
+        data={
+            "tool": "refresh_registry",
+            "total": len(agents),
+            "running": running,
+        },
+    )
     return JSONResponse(agents)
 
 
@@ -540,6 +637,7 @@ async def api_agents_refresh():
 async def api_agents_register(request: Request):
     """Register an external A2A agent by base URL or agent card URL."""
     from agents.registry import fetch_a2a_agent_card, register_a2a_agent
+
     body = await request.json()
     url = body.get("url", "").strip()
     if not url:
@@ -550,9 +648,12 @@ async def api_agents_register(request: Request):
             base = base[: -len("/.well-known/agent-card.json")].rstrip("/") or base
         card = await fetch_a2a_agent_card(base)
         if not card:
-            return JSONResponse({
-                "error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"
-            }, status_code=400)
+            return JSONResponse(
+                {
+                    "error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"
+                },
+                status_code=400,
+            )
         agent = register_a2a_agent(base, card)
         return JSONResponse(agent)
     except Exception as exc:
@@ -564,15 +665,20 @@ async def api_agents_register(request: Request):
 async def api_agents_remove(agent_id: str):
     """Remove a manually registered A2A agent."""
     from agents.registry import remove_agent
+
     if remove_agent(agent_id):
         return JSONResponse({"status": "removed"})
-    return JSONResponse({"error": "Agent not found or is an MCP server (cannot remove)"}, status_code=404)
+    return JSONResponse(
+        {"error": "Agent not found or is an MCP server (cannot remove)"},
+        status_code=404,
+    )
 
 
 @app.get("/api/agents/{agent_id:path}/history")
 async def api_agent_history(agent_id: str):
     """Return status history for a specific agent."""
     from agents.registry import get_agent_status_history
+
     rows = get_agent_status_history(agent_id, limit=50)
     return JSONResponse(rows)
 
@@ -581,6 +687,7 @@ async def api_agent_history(agent_id: str):
 async def api_telemetry_summary():
     """Return aggregated telemetry data (token usage, costs, latency)."""
     from agents.telemetry import get_telemetry_summary
+
     return JSONResponse(get_telemetry_summary())
 
 
@@ -588,6 +695,7 @@ async def api_telemetry_summary():
 async def api_agents_activity_recent():
     """Return recent agent activity events."""
     from agents.activity_stream import get_recent_events
+
     return JSONResponse(get_recent_events(limit=50))
 
 
@@ -595,6 +703,7 @@ async def api_agents_activity_recent():
 async def api_agents_activity_stream():
     """SSE endpoint for real-time agent activity (AOP-compatible)."""
     import json
+
     from agents.activity_stream import subscribe, unsubscribe
 
     queue = subscribe()
@@ -606,7 +715,7 @@ async def api_agents_activity_stream():
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
                     yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
-                    yield f": keepalive\n\n"
+                    yield ": keepalive\n\n"
         except asyncio.CancelledError:
             pass
         finally:
@@ -625,6 +734,7 @@ async def api_agents_activity_stream():
 
 if __name__ == "__main__":
     import os
+
     import uvicorn
 
     def _handle_signal(signum, _frame):

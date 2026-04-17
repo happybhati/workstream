@@ -1,4 +1,5 @@
 """Agent registry: discovers MCP servers and A2A agents, tracks health."""
+
 from __future__ import annotations
 
 import asyncio
@@ -14,15 +15,19 @@ import httpx
 
 logger = logging.getLogger("agents.registry")
 
-MCP_CONFIG_PATH = Path(os.getenv(
-    "MCP_CONFIG_PATH",
-    str(Path.home() / ".cursor" / "mcp.json"),
-))
+MCP_CONFIG_PATH = Path(
+    os.getenv(
+        "MCP_CONFIG_PATH",
+        str(Path.home() / ".cursor" / "mcp.json"),
+    )
+)
 
-STATUS_DB_PATH = Path(os.getenv(
-    "AGENT_REGISTRY_DB_PATH",
-    str(Path(__file__).resolve().parent / "agent_status_history.sqlite"),
-))
+STATUS_DB_PATH = Path(
+    os.getenv(
+        "AGENT_REGISTRY_DB_PATH",
+        str(Path(__file__).resolve().parent / "agent_status_history.sqlite"),
+    )
+)
 
 # In-memory registry updated by polling
 _registry: dict[str, dict] = {}
@@ -67,7 +72,9 @@ def _init_status_db_sync() -> None:
         conn.close()
 
 
-def _append_status_history_sync(rows: list[tuple[str, str, str, str | None, str]]) -> None:
+def _append_status_history_sync(
+    rows: list[tuple[str, str, str, str | None, str]],
+) -> None:
     """Insert status snapshots (sync; run via asyncio.to_thread)."""
     if not rows:
         return
@@ -213,7 +220,9 @@ async def check_local_server_health(info: dict) -> str:
         if not search_terms:
             search_terms = [cmd.split("/")[-1]]
         proc = await asyncio.create_subprocess_exec(
-            "pgrep", "-f", search_terms[0],
+            "pgrep",
+            "-f",
+            search_terms[0],
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -310,7 +319,12 @@ def _save_registered_agent_sync(agent_id: str, base_url: str, card: dict) -> Non
         conn.execute(
             """INSERT OR REPLACE INTO registered_agents (agent_id, base_url, card_json, registered_at)
                VALUES (?, ?, ?, ?)""",
-            (agent_id, base_url, json.dumps(card), datetime.now(timezone.utc).isoformat()),
+            (
+                agent_id,
+                base_url,
+                json.dumps(card),
+                datetime.now(timezone.utc).isoformat(),
+            ),
         )
         conn.commit()
     finally:
@@ -344,7 +358,9 @@ def register_a2a_agent(base_url: str, card: dict) -> dict:
     name = card.get("name", base_url)
     agent_id = f"a2a:{name}"
     skills = card.get("skills", [])
-    capabilities = [s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)]
+    capabilities = [
+        s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)
+    ]
     info = {
         "id": agent_id,
         "name": name,
@@ -360,7 +376,11 @@ def register_a2a_agent(base_url: str, card: dict) -> dict:
             "description": card.get("description", ""),
             "version": card.get("version", ""),
             "provider": card.get("provider", {}),
-            "auth": card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none",
+            "auth": (
+                card.get("auth", {}).get("type", "none")
+                if isinstance(card.get("auth"), dict)
+                else "none"
+            ),
             "skills_count": len(skills),
             "input_modes": card.get("defaultInputModes", []),
             "output_modes": card.get("defaultOutputModes", []),
@@ -439,7 +459,9 @@ def _restore_registered_agents() -> None:
         agent_id = f"a2a:{name}"
         if agent_id not in _a2a_agents:
             skills = card.get("skills", [])
-            capabilities = [s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)]
+            capabilities = [
+                s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)
+            ]
             _a2a_agents[agent_id] = {
                 "id": agent_id,
                 "name": name,
@@ -455,7 +477,11 @@ def _restore_registered_agents() -> None:
                     "description": card.get("description", ""),
                     "version": card.get("version", ""),
                     "provider": card.get("provider", {}),
-                    "auth": card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none",
+                    "auth": (
+                        card.get("auth", {}).get("type", "none")
+                        if isinstance(card.get("auth"), dict)
+                        else "none"
+                    ),
                     "skills_count": len(skills),
                     "input_modes": card.get("defaultInputModes", []),
                     "output_modes": card.get("defaultOutputModes", []),

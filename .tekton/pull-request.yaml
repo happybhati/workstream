@@ -1,0 +1,83 @@
+# Konflux PipelineRun for pull requests
+# This file makes the repo Konflux-ready. To onboard:
+#   1. Install Konflux on a Kubernetes cluster (Kind/OpenShift)
+#   2. Create a Konflux Application and Component pointing to this repo
+#   3. Konflux will automatically detect and run this pipeline on PRs
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: workstream-on-pull-request
+  annotations:
+    pipelinesascode.tekton.dev/on-event: "[pull_request]"
+    pipelinesascode.tekton.dev/on-target-branch: "[main]"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+  labels:
+    appstudio.openshift.io/application: workstream
+    appstudio.openshift.io/component: workstream
+    pipelines.appstudio.openshift.io/type: build
+spec:
+  pipelineSpec:
+    tasks:
+      - name: clone
+        taskRef:
+          resolver: bundles
+          params:
+            - name: bundle
+              value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.1
+            - name: name
+              value: git-clone
+            - name: kind
+              value: task
+        params:
+          - name: url
+            value: "{{repo_url}}"
+          - name: revision
+            value: "{{revision}}"
+        workspaces:
+          - name: output
+            workspace: workspace
+
+      - name: build
+        runAfter: ["clone"]
+        taskSpec:
+          steps:
+            - name: build-image
+              image: registry.fedoraproject.org/fedora:41
+              script: |
+                cd $(workspaces.source.path)
+                dnf install -y python3.12 python3.12-pip
+                python3.12 -m pip install -r requirements.txt
+                python3.12 -m py_compile app.py config.py database.py
+                echo "Build verification passed"
+          workspaces:
+            - name: source
+        workspaces:
+          - name: source
+            workspace: workspace
+
+      - name: test
+        runAfter: ["build"]
+        taskSpec:
+          steps:
+            - name: run-tests
+              image: registry.fedoraproject.org/fedora:41
+              script: |
+                cd $(workspaces.source.path)
+                dnf install -y python3.12 python3.12-pip
+                python3.12 -m pip install -r requirements.txt -r requirements-dev.txt
+                python3.12 -m pytest --tb=short -q
+                echo "Tests passed"
+          workspaces:
+            - name: source
+        workspaces:
+          - name: source
+            workspace: workspace
+
+  workspaces:
+    - name: workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi

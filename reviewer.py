@@ -4,6 +4,7 @@ Fetches diffs from GitHub/GitLab, sanitizes secrets, sends to a configured
 AI provider, and returns structured review comments. Optionally posts
 human-approved comments back to the VCS.
 """
+
 from __future__ import annotations
 
 import json
@@ -50,36 +51,43 @@ def sanitize_diff(diff: str) -> str:
 # Provider availability
 # ---------------------------------------------------------------------------
 
+
 async def get_available_providers() -> list[dict]:
     """Return list of configured AI providers (names only, no keys)."""
     providers = []
 
     if settings.ai_claude_api_key:
-        providers.append({
-            "id": "claude",
-            "name": "Claude",
-            "model": settings.ai_claude_model,
-            "local": False,
-        })
+        providers.append(
+            {
+                "id": "claude",
+                "name": "Claude",
+                "model": settings.ai_claude_model,
+                "local": False,
+            }
+        )
 
     if settings.ai_gemini_api_key:
-        providers.append({
-            "id": "gemini",
-            "name": "Gemini",
-            "model": settings.ai_gemini_model,
-            "local": False,
-        })
+        providers.append(
+            {
+                "id": "gemini",
+                "name": "Gemini",
+                "model": settings.ai_gemini_model,
+                "local": False,
+            }
+        )
 
     try:
         async with httpx.AsyncClient(timeout=3) as client:
             resp = await client.get(f"{settings.ai_ollama_url}/api/tags")
             if resp.status_code == 200:
-                providers.append({
-                    "id": "ollama",
-                    "name": "Ollama (local)",
-                    "model": settings.ai_ollama_model,
-                    "local": True,
-                })
+                providers.append(
+                    {
+                        "id": "ollama",
+                        "name": "Ollama (local)",
+                        "model": settings.ai_ollama_model,
+                        "local": True,
+                    }
+                )
     except Exception:
         pass
 
@@ -89,6 +97,7 @@ async def get_available_providers() -> list[dict]:
 # ---------------------------------------------------------------------------
 # Diff fetching
 # ---------------------------------------------------------------------------
+
 
 def _parse_pr_id(pr_id: str) -> tuple[str, str, int]:
     """Parse 'github:org/repo:42' into (platform, repo_full_name, number)."""
@@ -109,7 +118,9 @@ async def _fetch_github_diff(repo: str, number: int) -> tuple[str, dict]:
     }
 
     async with httpx.AsyncClient(
-        base_url="https://api.github.com", headers=headers, timeout=60,
+        base_url="https://api.github.com",
+        headers=headers,
+        timeout=60,
     ) as client:
         meta_resp = await client.get(
             f"/repos/{repo}/pulls/{number}",
@@ -145,7 +156,9 @@ async def _fetch_gitlab_diff(repo: str, number: int) -> tuple[str, dict]:
     encoded = quote_plus(repo)
 
     async with httpx.AsyncClient(
-        headers=headers, timeout=60, verify=False,
+        headers=headers,
+        timeout=60,
+        verify=False,
     ) as client:
         meta_resp = await client.get(
             f"{api}/projects/{encoded}/merge_requests/{number}",
@@ -161,7 +174,7 @@ async def _fetch_gitlab_diff(repo: str, number: int) -> tuple[str, dict]:
     diffs_list = changes_resp.json()
     diff_text_parts = []
     for d in diffs_list:
-        header = f"diff --git a/{d.get('old_path','')} b/{d.get('new_path','')}\n"
+        header = f"diff --git a/{d.get('old_path', '')} b/{d.get('new_path', '')}\n"
         diff_text_parts.append(header + d.get("diff", ""))
     diff_text = "\n".join(diff_text_parts)
 
@@ -234,6 +247,7 @@ def _get_team_context(pr_id: str) -> str:
     may be called from both sync and async contexts.
     """
     import sqlite3
+
     try:
         parts = pr_id.split(":")
         repo = parts[1] if len(parts) >= 3 else ""
@@ -245,28 +259,31 @@ def _get_team_context(pr_id: str) -> str:
         conn.row_factory = sqlite3.Row
 
         # Check if ri_patterns table exists (may not on first run)
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()}
+        tables = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
         if "ri_patterns" not in tables:
             conn.close()
             return ""
 
         rows = conn.execute(
-            "SELECT category, pattern FROM ri_patterns "
-            "WHERE repo = ? ORDER BY frequency DESC LIMIT 5", (repo,)
+            "SELECT category, pattern FROM ri_patterns WHERE repo = ? ORDER BY frequency DESC LIMIT 5",
+            (repo,),
         ).fetchall()
         repo_patterns = [dict(r) for r in rows]
 
         rows = conn.execute(
-            "SELECT reviewer, focus_areas FROM ri_reviewer_profiles "
-            "ORDER BY total_comments DESC LIMIT 3"
+            "SELECT reviewer, focus_areas FROM ri_reviewer_profiles ORDER BY total_comments DESC LIMIT 3"
         ).fetchall()
 
         rows2 = conn.execute(
             "SELECT c.category, COUNT(*) as cnt FROM ri_review_comments c "
             "JOIN ri_pull_requests p ON c.pr_id = p.id WHERE p.repo = ? "
-            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC", (repo,)
+            "AND c.category != '' GROUP BY c.category ORDER BY cnt DESC",
+            (repo,),
         ).fetchall()
         focus_areas = {r["category"]: r["cnt"] for r in rows2}
 
@@ -290,6 +307,7 @@ def _get_team_context(pr_id: str) -> str:
                 lines.append(f"  [{p['category']}] {p['pattern']}")
         if rows:
             import json as _json
+
             lines.append("Key reviewer expectations:")
             for r in rows:
                 areas_raw = r["focus_areas"] if r["focus_areas"] else "[]"
@@ -298,7 +316,9 @@ def _get_team_context(pr_id: str) -> str:
                 except Exception:
                     areas = []
                 if areas:
-                    lines.append(f"  - {r['reviewer']} focuses on: {', '.join(str(a) for a in areas[:3])}")
+                    lines.append(
+                        f"  - {r['reviewer']} focuses on: {', '.join(str(a) for a in areas[:3])}"
+                    )
         lines.append("--- END TEAM CONTEXT ---\n")
         return "\n".join(lines)
 
@@ -318,14 +338,14 @@ def build_review_prompt(metadata: dict, diff: str, pr_id: str = "") -> tuple[str
     user_prompt = f"""\
 Review the following pull request.
 
-**Title:** {metadata.get('title', '')}
-**Author:** {metadata.get('author', '')}
-**Branch:** {metadata.get('head', '')} → {metadata.get('base', '')}
-**Files changed:** {metadata.get('changed_files', '?')} | \
-+{metadata.get('additions', '?')} −{metadata.get('deletions', '?')}
+**Title:** {metadata.get("title", "")}
+**Author:** {metadata.get("author", "")}
+**Branch:** {metadata.get("head", "")} → {metadata.get("base", "")}
+**Files changed:** {metadata.get("changed_files", "?")} | \
++{metadata.get("additions", "?")} −{metadata.get("deletions", "?")}
 
 **Description:**
-{metadata.get('body', 'No description provided.')}
+{metadata.get("body", "No description provided.")}
 {team_context}
 **Diff:**
 ```
@@ -337,6 +357,7 @@ Review the following pull request.
 # ---------------------------------------------------------------------------
 # AI provider callers
 # ---------------------------------------------------------------------------
+
 
 def _extract_json(text: str) -> dict:
     """Extract JSON object from AI response that may include markdown fences."""
@@ -430,6 +451,7 @@ _PROVIDER_MAP = {
 # Main orchestrator
 # ---------------------------------------------------------------------------
 
+
 async def review_pr(pr_id: str, provider: str) -> dict:
     """Fetch diff, sanitize, call AI, return structured review."""
     import time as _time
@@ -443,7 +465,9 @@ async def review_pr(pr_id: str, provider: str) -> dict:
 
     logger.info(
         "Requesting review from %s for %s (%d chars of diff)",
-        provider, pr_id, len(diff_clean),
+        provider,
+        pr_id,
+        len(diff_clean),
     )
 
     t0 = _time.monotonic()
@@ -459,6 +483,7 @@ async def review_pr(pr_id: str, provider: str) -> dict:
         latency = int((_time.monotonic() - t0) * 1000)
         try:
             from agents.telemetry import record_event
+
             input_chars = len(system) + len(user)
             est_input_tokens = input_chars // 4
             est_output_tokens = 500
@@ -470,10 +495,15 @@ async def review_pr(pr_id: str, provider: str) -> dict:
             elif provider == "ollama":
                 model = settings.ai_ollama_model
             record_event(
-                "ai-review", "review_pr",
-                provider=provider, model=model,
-                input_tokens=est_input_tokens, output_tokens=est_output_tokens,
-                latency_ms=latency, status=status, error=error_msg,
+                "ai-review",
+                "review_pr",
+                provider=provider,
+                model=model,
+                input_tokens=est_input_tokens,
+                output_tokens=est_output_tokens,
+                latency_ms=latency,
+                status=status,
+                error=error_msg,
                 metadata={"pr_id": pr_id},
             )
         except Exception:
@@ -493,6 +523,7 @@ async def review_pr(pr_id: str, provider: str) -> dict:
 # ---------------------------------------------------------------------------
 # Post review to VCS
 # ---------------------------------------------------------------------------
+
 
 async def post_review_to_github(repo: str, number: int, comments: list[dict]) -> dict:
     """Post review comments to a GitHub PR."""
@@ -514,7 +545,9 @@ async def post_review_to_github(repo: str, number: int, comments: list[dict]) ->
     review_body = f"## AI-Assisted Review\n\n{review_body}"
 
     async with httpx.AsyncClient(
-        base_url="https://api.github.com", headers=headers, timeout=30,
+        base_url="https://api.github.com",
+        headers=headers,
+        timeout=30,
     ) as client:
         resp = await client.post(
             f"/repos/{repo}/pulls/{number}/reviews",
@@ -543,7 +576,9 @@ async def post_review_to_gitlab(repo: str, number: int, comments: list[dict]) ->
     note_body = f"## AI-Assisted Review\n\n{note_body}"
 
     async with httpx.AsyncClient(
-        headers=headers, timeout=30, verify=False,
+        headers=headers,
+        timeout=30,
+        verify=False,
     ) as client:
         resp = await client.post(
             f"{api}/projects/{encoded}/merge_requests/{number}/notes",
