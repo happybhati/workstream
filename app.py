@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import logging.handlers
+import os
 import signal
 import sys
 from contextlib import asynccontextmanager
@@ -65,27 +66,12 @@ async def _poll_loop() -> None:
 
     while True:
         try:
-            emit_event(
-                "tool_start",
-                "workstream",
-                category="operation",
-                data={"tool": "poll_all"},
-            )
+            emit_event("tool_start", "workstream", category="operation", data={"tool": "poll_all"})
             await poll_all()
-            emit_event(
-                "tool_end",
-                "workstream",
-                category="operation",
-                data={"tool": "poll_all", "status": "success"},
-            )
+            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "success"})
         except Exception:
             logger.exception("Poll loop error")
-            emit_event(
-                "tool_end",
-                "workstream",
-                category="operation",
-                data={"tool": "poll_all", "status": "error"},
-            )
+            emit_event("tool_end", "workstream", category="operation", data={"tool": "poll_all", "status": "error"})
         await asyncio.sleep(settings.poll_interval_seconds)
 
 
@@ -108,6 +94,26 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Workstream", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Optional bearer-token gate. Active only when WORKSTREAM_AUTH_TOKEN is set."""
+    token = os.getenv("WORKSTREAM_AUTH_TOKEN", "")
+    if not token:
+        return await call_next(request)
+
+    if request.url.path in ("/api/health",):
+        return await call_next(request)
+
+    auth_header = request.headers.get("authorization", "")
+    query_token = request.query_params.get("token", "")
+
+    if auth_header == f"Bearer {token}" or query_token == token:
+        return await call_next(request)
+
+    return JSONResponse({"error": "unauthorized"}, status_code=401)
+
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -185,13 +191,7 @@ async def api_sprint_info():
         matching = [sp for sp in sprints if sp["sprint_id"] == sid]
         projects = [sp["project"] for sp in matching]
         boards = {sp["project"]: sp["board_id"] for sp in matching}
-        merged_tasks = {
-            "new": 0,
-            "in_progress": 0,
-            "in_review": 0,
-            "done": 0,
-            "total": 0,
-        }
+        merged_tasks = {"new": 0, "in_progress": 0, "in_review": 0, "done": 0, "total": 0}
         for proj in projects:
             t = await get_sprint_tasks(proj)
             for k in merged_tasks:
@@ -588,12 +588,7 @@ async def api_agents_refresh():
     from agents.activity_stream import emit_event
     from agents.registry import refresh_registry
 
-    emit_event(
-        "tool_start",
-        "agent-registry",
-        category="operation",
-        data={"tool": "refresh_registry"},
-    )
+    emit_event("tool_start", "agent-registry", category="operation", data={"tool": "refresh_registry"})
     agents = await refresh_registry()
     running = sum(1 for a in agents if a.get("status") == "running")
     emit_event(
@@ -625,8 +620,7 @@ async def api_agents_register(request: Request):
         card = await fetch_a2a_agent_card(base)
         if not card:
             return JSONResponse(
-                {"error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"},
-                status_code=400,
+                {"error": f"Could not fetch agent card from {base}/.well-known/agent-card.json"}, status_code=400
             )
         agent = register_a2a_agent(base, card)
         return JSONResponse(agent)
@@ -642,10 +636,7 @@ async def api_agents_remove(agent_id: str):
 
     if remove_agent(agent_id):
         return JSONResponse({"status": "removed"})
-    return JSONResponse(
-        {"error": "Agent not found or is an MCP server (cannot remove)"},
-        status_code=404,
-    )
+    return JSONResponse({"error": "Agent not found or is an MCP server (cannot remove)"}, status_code=404)
 
 
 @app.get("/api/agents/{agent_id:path}/history")
@@ -707,8 +698,6 @@ async def api_agents_activity_stream():
 
 
 if __name__ == "__main__":
-    import os
-
     import uvicorn
 
     def _handle_signal(signum, _frame):
@@ -719,5 +708,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    logger.info("Workstream PID %d starting on http://localhost:8080", os.getpid())
-    uvicorn.run("app:app", host="0.0.0.0", port=8080)
+    host = os.getenv("WORKSTREAM_HOST", "127.0.0.1")
+    port = int(os.getenv("WORKSTREAM_PORT", "8080"))
+    logger.info("Workstream PID %d starting on http://%s:%d", os.getpid(), host, port)
+    uvicorn.run("app:app", host=host, port=port)

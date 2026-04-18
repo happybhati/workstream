@@ -1,0 +1,52 @@
+# Kubernetes / OpenShift Deployment for Workstream.
+# Requires a Secret named "workstream-secrets" with your tokens.
+#
+# Apply: kubectl apply -f docs/deployment/
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workstream
+  labels:
+    app: workstream
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workstream
+  template:
+    metadata:
+      labels:
+        app: workstream
+    spec:
+      containers:
+        - name: workstream
+          image: quay.io/happybhati/workstream:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: workstream-secrets
+          env:
+            - name: WORKSTREAM_HOST
+              value: "0.0.0.0"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      restartPolicy: Always
