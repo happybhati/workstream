@@ -333,22 +333,21 @@ async def api_readiness_scan(request: Request):
         scan_result = await scan_repo(repo_url)
         score_result = score_repo(scan_result)
 
-        await insert_readiness_scan(
-            {
-                "repo_url": repo_url,
-                "owner": scan_result["owner"],
-                "repo": scan_result["repo"],
-                "score_total": score_result["total"],
-                "score_agent_config": score_result["categories"]["agent_config"]["score"],
-                "score_documentation": score_result["categories"]["documentation"]["score"],
-                "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
-                "score_code_structure": score_result["categories"]["code_structure"]["score"],
-                "score_security": score_result["categories"]["security"]["score"],
-                "grade": score_result["grade"],
-                "findings": json.dumps(score_result),
-                "scanned_at": scan_result["scanned_at"],
-            }
-        )
+        await insert_readiness_scan({
+            "repo_url": repo_url,
+            "owner": scan_result["owner"],
+            "repo": scan_result["repo"],
+            "score_total": score_result["total"],
+            "score_agent_config": score_result["categories"]["agent_config"]["score"],
+            "score_documentation": score_result["categories"]["documentation"]["score"],
+            "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
+            "score_code_structure": score_result["categories"]["code_structure"]["score"],
+            "score_security": score_result["categories"]["security"]["score"],
+            "score_fullsend": score_result["categories"].get("fullsend_readiness", {}).get("score", 0),
+            "grade": score_result["grade"],
+            "findings": json.dumps(score_result),
+            "scanned_at": scan_result["scanned_at"],
+        })
 
         return JSONResponse(
             {

@@ -37,6 +37,8 @@ KEY_FILES = [
     ".github/copilot-instructions.md",
     ".github/dependabot.yml",
     ".codex/config.toml",
+    "BOOKMARKS.md",
+    "Makefile",
 ]
 
 LINTER_GLOBS = {
@@ -211,6 +213,56 @@ async def scan_repo(repo_url: str) -> dict:
     has_dependabot = bool(key_files.get(".github/dependabot.yml", ""))
     has_renovate = bool(renovate_files)
 
+    e2e_dirs = sorted({
+        p.split("/")[0] for p in all_paths
+        if p.split("/")[0].lower() in ("e2e", "integration-tests", "integration")
+        and "/" in p
+    } | {
+        "/".join(p.split("/")[:2]) for p in all_paths
+        if len(p.split("/")) >= 3 and p.split("/")[1].lower() in ("e2e", "integration")
+    })
+
+    hack_scripts = sorted(p for p in all_paths if p.startswith("hack/"))
+
+    kind_configs = sorted(
+        p for p in all_paths
+        if "kind" in p.lower()
+        and (p.endswith(".yaml") or p.endswith(".yml") or p.endswith(".conf"))
+    )
+
+    dockerfiles = sorted(
+        p for p in all_paths
+        if p.split("/")[-1].lower() in ("dockerfile", "containerfile")
+        or p.split("/")[-1].lower().startswith("dockerfile.")
+    )
+
+    deployment_manifests = sorted(
+        p for p in all_paths
+        if any(seg in p.lower() for seg in ("deploy", "kustomize", "helm", "manifest", "k8s", "kubernetes"))
+        and (p.endswith(".yaml") or p.endswith(".yml") or p.endswith(".json"))
+    )
+
+    existing_skills = sorted(p for p in all_paths if p.startswith("skills/") and p.endswith("SKILL.md"))
+
+    ci_content = {}
+    async with httpx.AsyncClient(
+        base_url=GITHUB_API,
+        headers=_github_headers(),
+        timeout=30,
+    ) as client:
+        ci_yaml_paths = [p for p in all_paths if p.startswith(".github/workflows/") and (p.endswith(".yml") or p.endswith(".yaml"))]
+        for ci_path in ci_yaml_paths[:5]:
+            content = await _fetch_file(client, owner, repo, ci_path)
+            if content:
+                ci_content[ci_path] = content
+            await asyncio.sleep(0.1)
+
+    ci_commands = _extract_ci_commands(ci_content)
+    makefile_targets = _extract_makefile_targets(key_files.get("Makefile", ""))
+
+    claude_md_lines = len(key_files.get("CLAUDE.md", "").splitlines()) if key_files.get("CLAUDE.md") else 0
+    has_bookmarks = bool(key_files.get("BOOKMARKS.md", ""))
+
     return {
         "owner": owner,
         "repo": repo,
@@ -237,6 +289,17 @@ async def scan_repo(repo_url: str) -> dict:
         "gitignore_covers_secrets": gitignore_covers_secrets,
         "has_dependabot": has_dependabot,
         "has_renovate": has_renovate,
+        "e2e_dirs": e2e_dirs,
+        "hack_scripts": hack_scripts,
+        "kind_configs": kind_configs,
+        "dockerfiles": dockerfiles,
+        "deployment_manifests": deployment_manifests,
+        "existing_skills": existing_skills,
+        "ci_content": ci_content,
+        "ci_commands": ci_commands,
+        "makefile_targets": makefile_targets,
+        "claude_md_lines": claude_md_lines,
+        "has_bookmarks": has_bookmarks,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -288,6 +351,43 @@ async def _check_ci(client: httpx.AsyncClient, owner: str, repo: str) -> list[st
         return []
     data = resp.json()
     return [w["name"] for w in data.get("workflows", [])]
+
+
+def _extract_ci_commands(ci_content: dict[str, str]) -> dict[str, list[str]]:
+    """Extract build, test, and lint commands from CI workflow YAML."""
+    commands: dict[str, list[str]] = {"build": [], "test": [], "lint": [], "install": [], "other": []}
+    seen: set[str] = set()
+
+    run_re = re.compile(r"^\s*-?\s*run:\s*[|>]?\s*(.+)$", re.MULTILINE)
+    test_kw = re.compile(r"(?i)(pytest|go\s+test|npm\s+test|cargo\s+test|make\s+test|yarn\s+test|mvn\s+test|tox)")
+    build_kw = re.compile(r"(?i)(go\s+build|npm\s+run\s+build|cargo\s+build|make\s+build|mvn\s+package|gradle\s+build|docker\s+build)")
+    lint_kw = re.compile(r"(?i)(lint|golangci|eslint|ruff|flake8|pylint|clippy|prettier|black|isort|mypy)")
+    install_kw = re.compile(r"(?i)(pip\s+install|npm\s+(ci|install)|go\s+mod|cargo\s+fetch|yarn\s+install|poetry\s+install)")
+
+    for _path, content in ci_content.items():
+        for m in run_re.finditer(content):
+            cmd = m.group(1).strip().rstrip("|").strip()
+            if not cmd or cmd in seen or len(cmd) > 200:
+                continue
+            seen.add(cmd)
+            if test_kw.search(cmd):
+                commands["test"].append(cmd)
+            elif build_kw.search(cmd):
+                commands["build"].append(cmd)
+            elif lint_kw.search(cmd):
+                commands["lint"].append(cmd)
+            elif install_kw.search(cmd):
+                commands["install"].append(cmd)
+
+    return commands
+
+
+def _extract_makefile_targets(makefile_content: str) -> list[str]:
+    """Extract target names from a Makefile."""
+    if not makefile_content:
+        return []
+    target_re = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_-]*):", re.MULTILINE)
+    return sorted(set(target_re.findall(makefile_content)))
 
 
 def _find_file_in_tree(tree: list[str], filename: str) -> str | None:

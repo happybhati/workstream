@@ -1,21 +1,22 @@
-"""Score a repository's AI/agentic readiness across 5 categories.
+"""Score a repository's AI/agentic readiness across 6 categories.
 
 Pure logic -- operates on a ScanResult dict from scanner.py with no I/O.
 Returns a ScoreResult with per-category breakdowns, findings, and a letter grade.
 
-Scoring rubric (120 raw points, normalized to 100):
+Scoring rubric (150 raw points, normalized to 100):
   Agent Configuration  30 pts
   Documentation        25 pts
   CI/CD & Quality      25 pts
   Code Structure       20 pts
   Security & Safety    20 pts
+  Fullsend Readiness   30 pts  (skills, backpressure, context quality)
 """
 
 from __future__ import annotations
 
 import re
 
-RAW_MAX = 120
+RAW_MAX = 150
 
 
 def score_repo(scan: dict) -> dict:
@@ -26,6 +27,7 @@ def score_repo(scan: dict) -> dict:
         "ci_quality": _score_ci_quality(scan),
         "code_structure": _score_code_structure(scan),
         "security": _score_security(scan),
+        "fullsend_readiness": _score_fullsend_readiness(scan),
     }
 
     raw_total = sum(c["score"] for c in cats.values())
@@ -218,13 +220,6 @@ def _score_ci_quality(scan: dict) -> dict:
         else:
             findings.append(_finding(False, "No test files found", 0))
 
-    codeowners = scan["key_files"].get("CODEOWNERS", "")
-    if codeowners:
-        findings.append(_finding(True, "CODEOWNERS file present", 5))
-        score += 5
-    else:
-        findings.append(_finding(False, "CODEOWNERS missing", 0))
-
     return {"score": min(score, 25), "max": 25, "findings": findings}
 
 
@@ -337,6 +332,79 @@ def _score_security(scan: dict) -> dict:
         findings.append(_finding(False, "SECURITY.md missing", 0))
 
     return {"score": min(score, 20), "max": 20, "findings": findings}
+
+
+# ---------------------------------------------------------------------------
+# Fullsend Readiness (30 pts) -- skills, backpressure, context quality
+# ---------------------------------------------------------------------------
+
+def _score_fullsend_readiness(scan: dict) -> dict:
+    """Score readiness for fullsend agentic SDLC platform.
+
+    Based on fullsend-ai/fullsend repo-readiness and codebase-context docs:
+    - Agent skills (agentskills.io spec)
+    - Backpressure mechanisms (linters, type checkers, tests in CI)
+    - Context file quality (CLAUDE.md brevity, BOOKMARKS.md)
+    - CODEOWNERS for human approval paths
+    """
+    score = 0
+    findings = []
+
+    existing_skills = scan.get("existing_skills", [])
+    if len(existing_skills) >= 3:
+        findings.append(_finding(True, f"Agent Skills directory ({len(existing_skills)} skills)", 8))
+        score += 8
+    elif existing_skills:
+        findings.append(_finding(True, f"Agent Skills directory ({len(existing_skills)} skill{'s' if len(existing_skills) != 1 else ''})", 4))
+        score += 4
+    else:
+        findings.append(_finding(False, "No skills/ directory with SKILL.md files", 0))
+
+    ci_commands = scan.get("ci_commands", {})
+    bp_count = 0
+    if ci_commands.get("test"):
+        bp_count += 1
+    if ci_commands.get("lint"):
+        bp_count += 1
+    if scan.get("linter_files"):
+        bp_count += 1
+    if scan.get("test_dirs"):
+        bp_count += 1
+
+    if bp_count >= 3:
+        findings.append(_finding(True, f"Strong backpressure ({bp_count} mechanisms: tests, linters, CI)", 8))
+        score += 8
+    elif bp_count >= 1:
+        findings.append(_finding(True, f"Partial backpressure ({bp_count} mechanism{'s' if bp_count != 1 else ''})", 4))
+        score += 4
+    else:
+        findings.append(_finding(False, "No backpressure mechanisms (tests/linters in CI)", 0))
+
+    claude_md = scan["key_files"].get("CLAUDE.md", "")
+    claude_md_lines = scan.get("claude_md_lines", 0)
+    if claude_md and claude_md_lines <= 60:
+        findings.append(_finding(True, f"CLAUDE.md is concise ({claude_md_lines} lines, ≤60 recommended)", 5))
+        score += 5
+    elif claude_md and claude_md_lines > 60:
+        findings.append(_finding(True, f"CLAUDE.md is verbose ({claude_md_lines} lines, ≤60 recommended)", 2))
+        score += 2
+    else:
+        findings.append(_finding(False, "No CLAUDE.md for agent context", 0))
+
+    if scan.get("has_bookmarks"):
+        findings.append(_finding(True, "BOOKMARKS.md for progressive disclosure", 4))
+        score += 4
+    else:
+        findings.append(_finding(False, "No BOOKMARKS.md for on-demand references", 0))
+
+    codeowners = scan["key_files"].get("CODEOWNERS", "")
+    if codeowners:
+        findings.append(_finding(True, "CODEOWNERS defines human approval paths", 5))
+        score += 5
+    else:
+        findings.append(_finding(False, "No CODEOWNERS for merge approval paths", 0))
+
+    return {"score": min(score, 30), "max": 30, "findings": findings}
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +548,27 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
                 "impact": "+3 pts",
             }
         )
+
+    fullsend = categories["fullsend_readiness"]
+    if not scan.get("existing_skills"):
+        recs.append({
+            "priority": "high",
+            "text": "Add agent skills in skills/ directory (agentskills.io spec) — running-tests, debugging-guide, definition-of-done are high-value starting points",
+            "impact": "+6 pts",
+        })
+    if not scan.get("has_bookmarks"):
+        recs.append({
+            "priority": "medium",
+            "text": "Add BOOKMARKS.md for progressive disclosure — curated references agents load on demand",
+            "impact": "+3 pts",
+        })
+    claude_md_lines = scan.get("claude_md_lines", 0)
+    if claude_md_lines > 60:
+        recs.append({
+            "priority": "medium",
+            "text": f"Trim CLAUDE.md to ≤60 lines (currently {claude_md_lines}) — verbose context hurts agent performance (ETH Zürich research)",
+            "impact": "+3 pts",
+        })
 
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     recs.sort(key=lambda r: priority_order.get(r["priority"], 4))

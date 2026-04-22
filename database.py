@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS readiness_scans (
     score_ci_quality INTEGER DEFAULT 0,
     score_code_structure INTEGER DEFAULT 0,
     score_security INTEGER DEFAULT 0,
+    score_fullsend INTEGER DEFAULT 0,
     grade TEXT DEFAULT '',
     findings TEXT DEFAULT '',
     scanned_at TEXT NOT NULL
@@ -230,6 +231,8 @@ async def init_db() -> None:
         rs_cols = {row[1] for row in await cursor.fetchall()}
         if "score_security" not in rs_cols:
             await db.execute("ALTER TABLE readiness_scans ADD COLUMN score_security INTEGER DEFAULT 0")
+        if "score_fullsend" not in rs_cols:
+            await db.execute("ALTER TABLE readiness_scans ADD COLUMN score_fullsend INTEGER DEFAULT 0")
         await db.commit()
     finally:
         await db.close()
@@ -648,14 +651,15 @@ async def get_tomorrow_events() -> list[dict]:
 async def insert_readiness_scan(scan_data: dict) -> int:
     db = await get_db()
     try:
+        scan_data.setdefault("score_fullsend", 0)
         cursor = await db.execute(
             """INSERT INTO readiness_scans
                (repo_url, owner, repo, score_total, score_agent_config,
                 score_documentation, score_ci_quality, score_code_structure,
-                score_security, grade, findings, scanned_at)
+                score_security, score_fullsend, grade, findings, scanned_at)
                VALUES (:repo_url, :owner, :repo, :score_total, :score_agent_config,
                        :score_documentation, :score_ci_quality, :score_code_structure,
-                       :score_security, :grade, :findings, :scanned_at)""",
+                       :score_security, :score_fullsend, :grade, :findings, :scanned_at)""",
             scan_data,
         )
         await db.commit()
@@ -664,7 +668,7 @@ async def insert_readiness_scan(scan_data: dict) -> int:
         await db.close()
 
 
-async def get_readiness_history(limit: int = 20) -> list[dict]:
+async def get_readiness_history(limit: int = 50) -> list[dict]:
     db = await get_db()
     try:
         cursor = await db.execute(
