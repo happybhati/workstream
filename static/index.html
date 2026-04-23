@@ -1769,6 +1769,11 @@ header .actions {
 }
 .stale-badge.stale-warn { background: rgba(255,165,2,0.15); color: var(--orange); }
 .stale-badge.stale-old { background: rgba(255,71,87,0.15); color: var(--red); }
+.since-review-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 600; font-family: var(--font-mono);
+  background: rgba(255,165,2,0.15); color: var(--orange);
+}
 
 /* Search Bar */
 .search-bar {
@@ -3055,6 +3060,14 @@ function renderPR(pr) {
     else if (ageDays >= 3) staleHtml = `<span class="stale-badge stale-warn">${ageDays}d old</span>`;
   }
 
+  let sinceReviewHtml = '';
+  if (pr.my_last_review_at && (pr.commits_since_review > 0 || pr.comments_since_review > 0)) {
+    const parts = [];
+    if (pr.commits_since_review) parts.push(`${pr.commits_since_review} commit${pr.commits_since_review !== 1 ? 's' : ''}`);
+    if (pr.comments_since_review) parts.push(`${pr.comments_since_review} comment${pr.comments_since_review !== 1 ? 's' : ''}`);
+    sinceReviewHtml = `<span class="since-review-badge" title="Since your review on ${new Date(pr.my_last_review_at).toLocaleDateString()}">${parts.join(', ')} since your review</span>`;
+  }
+
   return `
     <div class="pr-card" onclick="window.open('${pr.url}', '_blank')">
       ${avatarHtml}
@@ -3066,6 +3079,7 @@ function renderPR(pr) {
           ${ciHtml}
           <span class="diff-stats"><span class="add">+${pr.additions || 0}</span> <span class="del">-${pr.deletions || 0}</span></span>
           ${pr.comments_count ? `<span>${pr.comments_count} comment${pr.comments_count !== 1 ? 's' : ''}</span>` : ''}
+          ${sinceReviewHtml}
         </div>
       </div>
       <div class="pr-meta-right">
