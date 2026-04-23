@@ -101,12 +101,40 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Workstream", lifespan=lifespan)
 
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """Optional bearer-token gate. Active only when WORKSTREAM_AUTH_TOKEN is set."""
+    import os
+
+    token = os.getenv("WORKSTREAM_AUTH_TOKEN", "")
+    if not token:
+        return await call_next(request)
+
+    if request.url.path in ("/api/health",):
+        return await call_next(request)
+
+    auth_header = request.headers.get("authorization", "")
+    query_token = request.query_params.get("token", "")
+
+    if auth_header == f"Bearer {token}" or query_token == token:
+        return await call_next(request)
+
+    return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/")
 async def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+@app.get("/api/health")
+async def api_health():
+    """Health check endpoint for container orchestration and monitoring."""
+    return JSONResponse({"status": "ok"})
 
 
 @app.get("/api/config")
