@@ -30,6 +30,7 @@ from database import (
 )
 from pollers import poll_all
 from reviewer import (
+    build_copy_prompt,
     build_review_prompt,
     fetch_pr_diff,
     get_available_providers,
@@ -265,17 +266,15 @@ async def api_review_providers():
 
 @app.post("/api/review/prompt")
 async def api_review_prompt(request: Request):
-    """Return the full review prompt so the user can paste it into any LLM."""
+    """Return a clean review prompt (no raw diff) for pasting into external AI tools."""
     body = await request.json()
     pr_id = body.get("pr_id", "")
     if not pr_id:
         return JSONResponse({"error": "pr_id is required"}, status_code=400)
     try:
-        diff_raw, metadata = await fetch_pr_diff(pr_id)
-        diff_clean = sanitize_diff(diff_raw)
-        system, user = build_review_prompt(metadata, diff_clean, pr_id=pr_id)
-        full_prompt = f"{system}\n\n---\n\n{user}"
-        return JSONResponse({"prompt": full_prompt, "metadata": metadata})
+        _diff_raw, metadata = await fetch_pr_diff(pr_id)
+        prompt = build_copy_prompt(metadata, pr_id=pr_id)
+        return JSONResponse({"prompt": prompt, "metadata": metadata})
     except Exception as exc:
         logger.exception("Failed to generate review prompt for %s", pr_id)
         return JSONResponse({"error": str(exc)}, status_code=500)
