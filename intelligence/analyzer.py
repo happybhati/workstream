@@ -6,6 +6,7 @@ and extracts recurring patterns from historical PR review data.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections import Counter, defaultdict
@@ -79,8 +80,7 @@ CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
     (
         "documentation",
         re.compile(
-            r"(?i)\b(doc|comment|readme|godoc|docstring|explain|clarif|description"
-            r"|// |\/\*|TODO|FIXME|HACK|NOQA)\b"
+            r"(?i)\b(doc|comment|readme|godoc|docstring|explain|clarif|description" r"|// |\/\*|TODO|FIXME|HACK|NOQA)\b"
         ),
     ),
     (
@@ -482,6 +482,103 @@ async def run_full_analysis() -> dict:
 # ---------------------------------------------------------------------------
 # Tool-specific insight generation
 # ---------------------------------------------------------------------------
+
+
+async def summarize_patterns_with_llm(
+    repo: str,
+    provider: str = "claude",
+) -> dict:
+    """Generate a narrative AI summary of review patterns using a configured LLM.
+
+    This is opt-in (triggered by user action) and tracked in telemetry.
+    Falls back gracefully if no API key is configured.
+    """
+    import time as _time
+
+    from intelligence.db import get_repo_intelligence
+
+    intel = await get_repo_intelligence(repo)
+    patterns = intel.get("patterns", [])
+    categories = intel.get("categories", {})
+    pr_count = intel.get("pr_count", 0)
+    comment_count = intel.get("comment_count", 0)
+
+    if not patterns and not categories:
+        return {"summary": "No review data available for this repository.", "provider": None}
+
+    prompt_data = (
+        f"Repository: {repo}\n"
+        f"Analyzed {pr_count} merged PRs with {comment_count} review comments.\n\n"
+        f"Category distribution:\n"
+    )
+    for cat, count in sorted(categories.items(), key=lambda x: -x[1]):
+        prompt_data += f"  - {cat}: {count} comments\n"
+    prompt_data += "\nTop patterns found:\n"
+    for p in patterns[:10]:
+        prompt_data += f"  [{p.get('category', '')}] {p.get('pattern', '')} (freq: {p.get('frequency', 0)})\n"
+        if p.get("example_comment"):
+            prompt_data += f"    Example: {p['example_comment'][:200]}\n"
+
+    system = (
+        "You are a senior engineering manager analyzing code review data. "
+        "Provide a concise 3-5 paragraph narrative summary of the team's review "
+        "patterns, key focus areas, strengths, and areas for improvement. "
+        "Be specific and actionable. Do not use bullet points."
+    )
+
+    t0 = _time.monotonic()
+    status = "success"
+    error_msg = ""
+    token_usage: dict = {}
+    summary_text = ""
+
+    try:
+        from reviewer import call_claude, call_gemini, call_ollama
+
+        callers = {"claude": call_claude, "gemini": call_gemini, "ollama": call_ollama}
+        caller = callers.get(provider)
+        if not caller:
+            return {"summary": f"Provider '{provider}' not available.", "provider": provider}
+
+        raw_result, token_usage = await caller(system, prompt_data)
+        summary_text = raw_result.get("summary", "") if isinstance(raw_result, dict) else str(raw_result)
+        if not summary_text and isinstance(raw_result, dict):
+            summary_text = json.dumps(raw_result, indent=2)
+    except Exception as exc:
+        status = "error"
+        error_msg = str(exc)
+        logger.warning("LLM intelligence summary failed: %s", exc)
+        summary_text = f"LLM summarization failed: {exc}"
+    finally:
+        latency = int((_time.monotonic() - t0) * 1000)
+        try:
+            from agents.telemetry import record_event
+            from config import settings
+
+            model = ""
+            if provider == "claude":
+                model = settings.ai_claude_model
+            elif provider == "gemini":
+                model = settings.ai_gemini_model
+            elif provider == "ollama":
+                model = settings.ai_ollama_model
+            record_event(
+                "intelligence",
+                "summarize_patterns",
+                provider=provider,
+                model=model,
+                input_tokens=token_usage.get("input_tokens", len(prompt_data) // 4),
+                output_tokens=token_usage.get("output_tokens", 500),
+                latency_ms=latency,
+                status=status,
+                error=error_msg,
+                feature="intelligence",
+                metadata={"repo": repo},
+            )
+        except Exception:
+            pass
+
+    return {"summary": summary_text, "provider": provider}
 
 
 async def generate_tool_insights(repo: str) -> dict:

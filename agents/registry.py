@@ -72,9 +72,7 @@ def _init_status_db_sync() -> None:
         conn.close()
 
 
-def _append_status_history_sync(
-    rows: list[tuple[str, str, str, str | None, str]],
-) -> None:
+def _append_status_history_sync(rows: list[tuple[str, str, str, str | None, str]]) -> None:
     """Insert status snapshots (sync; run via asyncio.to_thread)."""
     if not rows:
         return
@@ -319,12 +317,7 @@ def _save_registered_agent_sync(agent_id: str, base_url: str, card: dict) -> Non
         conn.execute(
             """INSERT OR REPLACE INTO registered_agents (agent_id, base_url, card_json, registered_at)
                VALUES (?, ?, ?, ?)""",
-            (
-                agent_id,
-                base_url,
-                json.dumps(card),
-                datetime.now(timezone.utc).isoformat(),
-            ),
+            (agent_id, base_url, json.dumps(card), datetime.now(timezone.utc).isoformat()),
         )
         conn.commit()
     finally:
@@ -374,7 +367,7 @@ def register_a2a_agent(base_url: str, card: dict) -> dict:
             "description": card.get("description", ""),
             "version": card.get("version", ""),
             "provider": card.get("provider", {}),
-            "auth": (card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none"),
+            "auth": card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none",
             "skills_count": len(skills),
             "input_modes": card.get("defaultInputModes", []),
             "output_modes": card.get("defaultOutputModes", []),
@@ -398,9 +391,46 @@ async def register_a2a_agent_from_card_url(agent_card_url: str) -> dict | None:
     return register_a2a_agent(base, card)
 
 
+def _register_builtin_a2a_agents() -> None:
+    """Auto-register the built-in local A2A agents if not already present."""
+    try:
+        from agents.a2a_servers import RELEASE_HEALTH_AGENT_CARD, WORKSTREAM_AGENT_CARD
+    except ImportError:
+        return
+    for card in (WORKSTREAM_AGENT_CARD, RELEASE_HEALTH_AGENT_CARD):
+        agent_id = f"a2a:{card['name']}"
+        if agent_id not in _a2a_agents:
+            name = card["name"]
+            skills = card.get("skills", [])
+            capabilities = [s.get("name", s.get("id", "")) for s in skills if isinstance(s, dict)]
+            _a2a_agents[agent_id] = {
+                "id": agent_id,
+                "name": name,
+                "source": "a2a",
+                "type": "local",
+                "status": "unknown",
+                "last_checked": None,
+                "last_seen": None,
+                "error": None,
+                "endpoint": card["url"],
+                "capabilities": capabilities,
+                "metadata": {
+                    "description": card.get("description", ""),
+                    "version": card.get("version", ""),
+                    "provider": {},
+                    "auth": "none",
+                    "skills_count": len(skills),
+                    "input_modes": card.get("defaultInputModes", []),
+                    "output_modes": card.get("defaultOutputModes", []),
+                    "builtin": True,
+                },
+            }
+
+
 async def refresh_registry() -> list[dict]:
     """Refresh all agent statuses and return the full list."""
     _restore_registered_agents()
+    _register_builtin_a2a_agents()
     mcp = load_mcp_servers()
     _registry.clear()
     _registry.update(mcp)
@@ -430,6 +460,7 @@ def get_all_agents() -> list[dict]:
     """Return current in-memory agent list (call refresh_registry first)."""
     if not _registry:
         _restore_registered_agents()
+        _register_builtin_a2a_agents()
         mcp = load_mcp_servers()
         _registry.update(mcp)
         _registry.update(_a2a_agents)
@@ -469,9 +500,7 @@ def _restore_registered_agents() -> None:
                     "description": card.get("description", ""),
                     "version": card.get("version", ""),
                     "provider": card.get("provider", {}),
-                    "auth": (
-                        card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none"
-                    ),
+                    "auth": card.get("auth", {}).get("type", "none") if isinstance(card.get("auth"), dict) else "none",
                     "skills_count": len(skills),
                     "input_modes": card.get("defaultInputModes", []),
                     "output_modes": card.get("defaultOutputModes", []),

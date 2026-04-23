@@ -1218,6 +1218,21 @@ header .actions {
 .theme-toggle:hover { border-color: var(--accent); color: var(--text); }
 .theme-toggle svg { width: 16px; height: 16px; }
 
+.cost-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cost-table th { text-align: left; padding: 6px 8px; font-weight: 600; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.cost-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-light, rgba(128,128,128,.1)); font-family: var(--font-mono); font-size: 11px; }
+.cost-table tr:hover td { background: var(--surface-hover, rgba(128,128,128,.05)); }
+.cost-card { background: var(--surface); border-radius: 10px; padding: 14px 16px; border: 1px solid var(--border); }
+.cost-card .cost-label { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; }
+.cost-card .cost-value { font-size: 20px; font-weight: 700; font-family: var(--font-mono); }
+.cost-card .cost-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.cost-event { padding: 8px 10px; border-bottom: 1px solid var(--border-light, rgba(128,128,128,.1)); font-size: 12px; display: flex; gap: 12px; align-items: center; }
+.cost-event:hover { background: var(--surface-hover, rgba(128,128,128,.05)); }
+.cost-event .ce-time { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); min-width: 80px; }
+.cost-event .ce-model { font-weight: 600; min-width: 140px; }
+.cost-event .ce-tokens { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+.cost-event .ce-cost { font-family: var(--font-mono); font-weight: 600; color: var(--green); }
+
 .beta-badge {
   display: inline-block; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
   padding: 1px 5px; border-radius: 3px; background: linear-gradient(135deg, var(--orange), var(--pink));
@@ -1769,10 +1784,17 @@ header .actions {
 }
 .stale-badge.stale-warn { background: rgba(255,165,2,0.15); color: var(--orange); }
 .stale-badge.stale-old { background: rgba(255,71,87,0.15); color: var(--red); }
+
 .since-review-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 10px; font-weight: 600; font-family: var(--font-mono);
-  background: rgba(255,165,2,0.15); color: var(--orange);
+  font-size: 9px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: rgba(255,165,2,0.15);
+  color: var(--orange);
+  border: 1px solid rgba(255,165,2,0.25);
 }
 
 /* Search Bar */
@@ -2630,6 +2652,18 @@ header .actions {
 .history-grade.grade-B { color: var(--blue); }
 .history-grade.grade-C { color: var(--orange); }
 .history-grade.grade-D, .history-grade.grade-F { color: var(--red); }
+.history-delete {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+}
+.history-delete:hover { border-color: var(--red); color: var(--red); }
 .history-rescan {
   background: none;
   border: 1px solid var(--border);
@@ -2642,13 +2676,65 @@ header .actions {
   transition: all 0.2s;
 }
 .history-rescan:hover { border-color: var(--accent); color: var(--accent); }
-.history-delete {
-  background: none; border: 1px solid transparent; color: var(--text-dim);
-  padding: 2px 6px; border-radius: 4px; font-size: 14px; cursor: pointer;
-  margin-left: 4px; transition: all 0.2s; line-height: 1;
-}
-.history-delete:hover { color: var(--red); border-color: var(--red); }
 
+.agentready-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.agentready-card h4 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.agentready-scores {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.agentready-score-box {
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  min-width: 100px;
+}
+.agentready-score-box .label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.agentready-score-box .value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.agentready-recs {
+  font-size: 12px;
+  color: var(--text);
+}
+.agentready-recs li {
+  padding: 3px 0;
+}
+.skills-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(46,213,115,0.15);
+  color: var(--green);
+  border: 1px solid rgba(46,213,115,0.3);
+  margin-left: 6px;
+}
 .readiness-spinner {
   display: flex;
   align-items: center;
@@ -2755,6 +2841,7 @@ header .actions {
     <button class="tab" data-tab="intelligence" onclick="switchTab('intelligence');loadIntelligence()">Intelligence <span class="count" id="countIntel">&#9679;</span></button>
     <button class="tab" data-tab="readiness" onclick="switchTab('readiness');loadReadinessHistory()">AI Readiness <span class="count" id="countReadiness">&#9679;</span></button>
     <button class="tab" data-tab="agents" onclick="switchTab('agents');loadAgents()">Agents <span class="beta-badge">Beta</span> <span class="count" id="countAgents">&#9679;</span></button>
+    <button class="tab" data-tab="ai-costs" onclick="switchTab('ai-costs');loadAiCosts()">AI Costs <span class="count" id="countAiCosts">$</span></button>
   </div>
 
   <div class="panel active" id="panel-my-prs">
@@ -2806,6 +2893,13 @@ header .actions {
       <div id="intelRepoList"><div style="color:var(--text-dim);font-size:12px;padding:8px">Loading...</div></div>
     </div>
     <div id="intelContent"></div>
+    <div id="intelAiSummary" style="display:none;margin-top:16px;padding:16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;font-weight:600">AI-Generated Summary</h4>
+        <span id="intelAiSummaryProvider" style="font-size:10px;color:var(--text-muted);font-family:var(--font-mono)"></span>
+      </div>
+      <div id="intelAiSummaryText" style="font-size:13px;line-height:1.6;white-space:pre-wrap"></div>
+    </div>
   </div>
 
   <div class="panel" id="panel-readiness">
@@ -2846,6 +2940,127 @@ header .actions {
           <button class="readiness-scan-btn" style="background:var(--surface);border:1px solid var(--border)" onclick="hideRegisterAgentDialog()">Cancel</button>
         </div>
         <div id="agentRegisterStatus" style="margin-top:8px;font-size:12px;font-family:var(--font-mono)"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-ai-costs">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0;font-size:15px;font-weight:600">AI Cost Analytics</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="costPeriodSelect" onchange="loadAiCosts()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+          <option value="7d">Last 7 days</option>
+          <option value="30d" selected>Last 30 days</option>
+          <option value="90d">Last 90 days</option>
+          <option value="all">All time</option>
+        </select>
+        <select id="reportTypeSelect" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+          <option value="weekly-digest">Weekly Digest</option>
+          <option value="cost-summary">Cost Report</option>
+          <option value="review-summary">Review Summary</option>
+        </select>
+        <button class="readiness-scan-btn" onclick="generateReport()" style="font-size:12px;padding:4px 10px">Generate Report</button>
+        <button class="readiness-scan-btn" onclick="toggleClaudeCodeImport()" style="font-size:12px;padding:4px 10px;background:linear-gradient(135deg,#d97706,#ea580c);color:#fff;border:none">Import Claude Code</button>
+        <button class="readiness-scan-btn" onclick="toggleManualCost()" style="font-size:12px;padding:4px 10px;background:var(--surface);border:1px solid var(--border)">+ Log Cost</button>
+        <button class="readiness-scan-btn" onclick="toggleModelManager()" style="font-size:12px;padding:4px 10px;background:var(--surface);border:1px solid var(--border)">Manage Models</button>
+      </div>
+    </div>
+
+    <div id="costTotalsCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-muted)">Daily Cost Trend</h4>
+        <canvas id="costTrendChart" height="200"></canvas>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-muted)">Cost by Model</h4>
+        <canvas id="costModelChart" height="200"></canvas>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px">
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-muted)">Per-Model Breakdown</h4>
+        <table class="cost-table" id="costModelTable">
+          <thead><tr><th>Model</th><th>Provider</th><th>Calls</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost (USD)</th><th>Avg Latency</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-muted)">Cost by Feature</h4>
+        <table class="cost-table" id="costFeatureTable">
+          <thead><tr><th>Feature</th><th>Calls</th><th>Tokens</th><th>Cost</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h4 style="margin:0 0 8px;font-size:13px;font-weight:600;color:var(--text-muted)">Recent AI Events</h4>
+      <div id="costRecentEvents" style="max-height:300px;overflow-y:auto"></div>
+    </div>
+
+    <div id="reportPanel" style="display:none;margin-top:20px;padding:16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;font-weight:600" id="reportTitle">Report</h4>
+        <div style="display:flex;gap:8px">
+          <button class="readiness-scan-btn" onclick="copyReport('md')" style="font-size:11px;padding:3px 8px">Copy Markdown</button>
+          <button class="readiness-scan-btn" onclick="copyReport('html')" style="font-size:11px;padding:3px 8px">Copy HTML</button>
+          <button class="readiness-scan-btn" onclick="downloadReport()" style="font-size:11px;padding:3px 8px">Download</button>
+          <button class="readiness-scan-btn" onclick="document.getElementById('reportPanel').style.display='none'" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border)">&times; Close</button>
+        </div>
+      </div>
+      <div id="reportContent" style="max-height:500px;overflow-y:auto;font-size:13px;line-height:1.6"></div>
+    </div>
+
+    <div id="claudeCodePanel" style="display:none;margin-top:20px;padding:16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h4 style="margin:0;font-size:13px;font-weight:600">Import from Claude Code CLI</h4>
+        <button class="readiness-scan-btn" onclick="document.getElementById('claudeCodePanel').style.display='none'" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border)">&times; Close</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px">Import token usage and cost data from your local Claude Code CLI sessions (~/.claude/).</p>
+      <div id="claudeCodeSessions" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="readiness-scan-btn" onclick="importAllClaudeSessions()" style="font-size:12px;padding:4px 10px">Import All Sessions</button>
+        <button class="readiness-scan-btn" onclick="loadClaudeCodeSessions()" style="font-size:12px;padding:4px 10px;background:var(--surface);border:1px solid var(--border)">Refresh</button>
+      </div>
+      <div id="claudeImportResult" style="margin-top:12px;display:none;padding:10px;border-radius:8px;font-size:12px"></div>
+    </div>
+
+    <div id="manualCostPanel" style="display:none;margin-top:20px;padding:16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <h4 style="margin:0;font-size:13px;font-weight:600">Log External AI Cost</h4>
+        <button class="readiness-scan-btn" onclick="document.getElementById('manualCostPanel').style.display='none'" style="font-size:11px;padding:3px 8px;background:var(--surface);border:1px solid var(--border)">&times; Close</button>
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px">Manually record costs from Cursor, ChatGPT, Copilot, or any AI tool that doesn't have automatic tracking.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 100px 100px auto;gap:8px;align-items:end">
+        <div><label style="font-size:11px;color:var(--text-muted)">Source</label>
+          <select id="manualSource" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px">
+            <option value="Cursor">Cursor</option>
+            <option value="ChatGPT">ChatGPT</option>
+            <option value="Copilot">GitHub Copilot</option>
+            <option value="Claude Pro">Claude Pro</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Note</label><input type="text" id="manualNote" placeholder="Monthly subscription" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Cost (USD)</label><input type="number" step="0.01" id="manualCost" placeholder="20.00" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Date</label><input type="date" id="manualDate" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <button class="readiness-scan-btn" onclick="addManualCost()" style="padding:4px 10px;font-size:12px;align-self:end">Add</button>
+      </div>
+    </div>
+
+    <div id="modelManagerPanel" style="display:none;margin-top:20px;padding:16px;background:var(--surface);border-radius:10px;border:1px solid var(--border)">
+      <h4 style="margin:0 0 12px;font-size:13px;font-weight:600">Model Pricing Registry</h4>
+      <div id="modelRegistryList" style="margin-bottom:12px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 80px 80px auto;gap:8px;align-items:end">
+        <div><label style="font-size:11px;color:var(--text-muted)">Model ID</label><input type="text" id="newModelId" placeholder="gpt-4o" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Provider</label><input type="text" id="newModelProvider" placeholder="openai" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">Display Name</label><input type="text" id="newModelName" placeholder="GPT-4o" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">$/M In</label><input type="number" step="0.001" id="newModelCostIn" placeholder="2.50" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--text-muted)">$/M Out</label><input type="number" step="0.001" id="newModelCostOut" placeholder="10.0" style="width:100%;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px"></div>
+        <button class="readiness-scan-btn" onclick="addModelPricing()" style="padding:4px 10px;font-size:12px;align-self:end">Add</button>
       </div>
     </div>
   </div>
@@ -3079,11 +3294,11 @@ function renderPR(pr) {
           ${ciHtml}
           <span class="diff-stats"><span class="add">+${pr.additions || 0}</span> <span class="del">-${pr.deletions || 0}</span></span>
           ${pr.comments_count ? `<span>${pr.comments_count} comment${pr.comments_count !== 1 ? 's' : ''}</span>` : ''}
-          ${sinceReviewHtml}
         </div>
       </div>
       <div class="pr-meta-right">
         ${reviewHtml}
+        ${sinceReviewHtml}
         ${staleHtml}
         <button class="ai-review-btn" onclick="openReviewModal('${pr.id}', '${escHtml(pr.title).replace(/'/g,"\\'")}', '${pr.repo_full_name}#${pr.number}', event)" title="AI-powered code review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2h1a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-5a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><circle cx="9" cy="14" r="1"/><circle cx="15" cy="14" r="1"/></svg>Review</button>
         <span class="badge ${stateClass}">${stateLabel}</span>
@@ -4282,7 +4497,40 @@ function renderIntelRepoResult(data) {
     html += `</div>`;
   }
 
+  html += `<div style="margin-top:16px;display:flex;gap:8px;align-items:center">
+    <button class="readiness-scan-btn" onclick="generateIntelSummary('${escapeHtml(data.repo)}')" id="intelSummarizeBtn" style="font-size:12px;padding:6px 14px">Generate AI Summary</button>
+    <span style="font-size:11px;color:var(--text-muted)">Uses your configured AI provider to analyze patterns</span>
+  </div>`;
+
   resultDiv.innerHTML = html;
+}
+
+let _currentIntelRepo = '';
+async function generateIntelSummary(repo) {
+  _currentIntelRepo = repo;
+  const btn = document.getElementById('intelSummarizeBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  const panel = document.getElementById('intelAiSummary');
+  const textEl = document.getElementById('intelAiSummaryText');
+  const provEl = document.getElementById('intelAiSummaryProvider');
+  try {
+    const providers = await (await fetch('/api/review/providers')).json();
+    const provider = providers.length ? providers[0].id : 'claude';
+    const resp = await fetch('/api/intelligence/summarize', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ repo, provider }),
+    });
+    const data = await resp.json();
+    if (panel) panel.style.display = 'block';
+    if (textEl) textEl.textContent = data.summary || 'No summary generated.';
+    if (provEl) provEl.textContent = data.provider ? `via ${data.provider}` : '';
+  } catch (e) {
+    if (panel) panel.style.display = 'block';
+    if (textEl) textEl.textContent = 'Failed to generate summary: ' + e.message;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Generate AI Summary'; }
+  }
 }
 
 function renderIntelligenceOverview(stats, patterns, reviewers) {
@@ -4381,6 +4629,32 @@ function escapeHtml(text) {
 let readinessLastScan = null;
 let readinessGeneratedFiles = null;
 let readinessHistoryLoaded = false;
+
+function _buildSkillsReadinessHtml(scan) {
+  const signals = [];
+  const check = (arr, label) => {
+    if (arr && arr.length) signals.push({found: true, label: `${label} (${arr.length})`});
+    else signals.push({found: false, label: label});
+  };
+  check(scan.e2e_dirs, 'E2E test dirs');
+  check(scan.hack_scripts, 'hack/ scripts');
+  check(scan.kind_configs, 'Kind configs');
+  check(scan.dockerfiles, 'Dockerfiles');
+  check(scan.deployment_manifests, 'Deployment manifests');
+  check(scan.existing_skills, 'Existing skills');
+
+  if (!signals.some(s => s.found !== undefined)) return '';
+
+  const items = signals.map(s => {
+    const icon = s.found ? '<span class="check">&#10003;</span>' : '<span class="miss">&#10007;</span>';
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;font-size:11px;font-family:var(--font-mono)">${icon} ${s.label}</span>`;
+  }).join('');
+
+  return `<div style="margin:16px 0">
+    <h4 style="font-size:12px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Skills Generation Signals</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${items}</div>
+  </div>`;
+}
 
 async function scanReadiness() {
   const input = document.getElementById('readinessRepoUrl');
@@ -4490,12 +4764,15 @@ function renderReadinessResult(data) {
       <div style="display:flex;flex-wrap:wrap;gap:8px">${toolCompatHtml}</div>
     </div>
     <div class="readiness-categories">${catCards}</div>
+    ${_buildSkillsReadinessHtml(scan)}
     ${recsHtml}
     <div class="readiness-actions">
       <button class="primary" onclick="generateReadinessFiles()">Generate AI-Ready Files</button>
+      <button onclick="runAgentready()" id="agentreadyBtn" style="background:var(--cyan);color:#000;border-color:var(--cyan)">Run agentready</button>
       <button onclick="downloadReadinessZip()" id="readinessDownloadBtn" disabled>Download ZIP</button>
       <button onclick="createReadinessPR()" id="readinessPrBtn" disabled>Create Draft PR</button>
     </div>
+    <div id="agentreadyResult" style="display:none;margin-bottom:20px"></div>
     <div class="readiness-files-preview" id="readinessFilesPreview"></div>
   `;
   resultDiv.className = 'readiness-result visible';
@@ -4529,13 +4806,31 @@ function renderFilePreview(files) {
   const names = Object.keys(files);
   if (!names.length) { preview.innerHTML = '<div style="padding:16px;color:var(--text-dim)">No files to generate -- repo already has all AI-ready files!</div>'; return; }
 
-  const tabs = names.map((n, i) =>
-    `<button class="readiness-file-tab ${i === 0 ? 'active' : ''}" onclick="switchFileTab(this,'${n.replace(/'/g,"\\'")}')\">${n}</button>`
-  ).join('');
+  const coreFiles = names.filter(n => !n.startsWith('skills/') && !n.startsWith('.claude/'));
+  const skillFiles = names.filter(n => n.startsWith('skills/'));
+  const claudeFiles = names.filter(n => n.startsWith('.claude/'));
 
+  let tabs = '';
+  coreFiles.forEach((n, i) => {
+    tabs += `<button class="readiness-file-tab ${i === 0 && !skillFiles.length ? 'active' : (i === 0 ? 'active' : '')}" onclick="switchFileTab(this,'${n.replace(/'/g,"\\'")}')">${n}</button>`;
+  });
+
+  if (skillFiles.length) {
+    tabs += `<span style="display:inline-flex;align-items:center;padding:6px 8px;font-size:10px;color:var(--text-dim);border-bottom:1px solid var(--border)">|</span>`;
+    skillFiles.forEach(n => {
+      const short = n.replace('skills/', '').replace('/SKILL.md', '');
+      tabs += `<button class="readiness-file-tab" onclick="switchFileTab(this,'${n.replace(/'/g,"\\'")}')" title="${n}"><span class="skills-badge" style="margin:0">skill</span> ${short}</button>`;
+    });
+  }
+
+  claudeFiles.forEach(n => {
+    tabs += `<button class="readiness-file-tab" onclick="switchFileTab(this,'${n.replace(/'/g,"\\'")}')">${n}</button>`;
+  });
+
+  const firstName = names[0];
   preview.innerHTML = `
-    <div class="readiness-file-tabs">${tabs}</div>
-    <div class="readiness-file-content"><pre id="readinessFileBody">${escapeHtml(files[names[0]])}</pre></div>
+    <div class="readiness-file-tabs" style="flex-wrap:wrap">${tabs}</div>
+    <div class="readiness-file-content"><pre id="readinessFileBody">${escapeHtml(files[firstName])}</pre></div>
   `;
 }
 
@@ -4602,6 +4897,94 @@ async function createReadinessPR() {
   }
 }
 
+async function runAgentready() {
+  if (!readinessLastScan) return;
+  const btn = document.getElementById('agentreadyBtn');
+  const resultBox = document.getElementById('agentreadyResult');
+  btn.disabled = true;
+  btn.textContent = 'Running agentready...';
+  resultBox.style.display = 'block';
+  resultBox.innerHTML = '<div class="readiness-spinner"><div class="rm-spinner"></div><span>Cloning repo & running agentready assess...</span></div>';
+
+  try {
+    const resp = await fetch('/api/readiness/agentready', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({repo_url: readinessLastScan.url}),
+    });
+    const data = await resp.json();
+
+    if (!data.installed) {
+      resultBox.innerHTML = `<div class="agentready-card">
+        <h4>agentready CLI</h4>
+        <div style="padding:12px;color:var(--orange);font-size:13px">
+          agentready is not installed. Install it with:<br>
+          <code style="display:block;margin-top:8px;padding:8px;background:var(--bg);border-radius:4px;font-family:var(--font-mono);font-size:12px">${escapeHtml(data.install_command)}</code>
+        </div>
+      </div>`;
+      return;
+    }
+
+    if (data.error) throw new Error(data.error);
+
+    const workstreamScore = readinessLastScan.score?.total ?? '?';
+    const agentreadyScore = data.score !== null ? data.score : '?';
+    const wsColor = typeof workstreamScore === 'number' ? (workstreamScore >= 70 ? 'var(--green)' : workstreamScore >= 40 ? 'var(--orange)' : 'var(--red)') : 'var(--red)';
+    const arColor = typeof agentreadyScore === 'number' ? (agentreadyScore >= 70 ? 'var(--green)' : agentreadyScore >= 40 ? 'var(--orange)' : 'var(--red)') : 'var(--red)';
+    const arGrade = data.grade ? ` <span style="font-size:11px;color:var(--text-muted)">(${data.grade})</span>` : '';
+
+    let failuresHtml = '';
+    if (data.failures && data.failures.length) {
+      failuresHtml = `<div style="margin-top:14px"><strong style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Failed Checks (${data.failures.length})</strong>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">${
+        data.failures.map(f => `<div style="font-size:12px;padding:4px 8px;background:rgba(255,71,87,0.08);border-radius:3px;font-family:var(--font-mono)"><span style="color:var(--red)">✗</span> ${escapeHtml(f.test)}${f.notes ? ` <span style="color:var(--text-dim);font-size:10px">— ${escapeHtml(f.notes)}</span>` : ''}</div>`).join('')
+      }</div></div>`;
+    }
+
+    let passesHtml = '';
+    if (data.passes && data.passes.length) {
+      passesHtml = `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px">Passed Checks (${data.passes.length})</summary>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">${
+        data.passes.map(p => `<div style="font-size:12px;padding:4px 8px;background:rgba(46,213,115,0.08);border-radius:3px;font-family:var(--font-mono)"><span style="color:var(--green)">✓</span> ${escapeHtml(p.test)}</div>`).join('')
+      }</div></details>`;
+    }
+
+    let rawHtml = '';
+    if (data.raw_output) {
+      rawHtml = `<details style="margin-top:10px;font-size:11px"><summary style="cursor:pointer;color:var(--text-muted)">Raw output</summary><pre style="margin-top:8px;padding:10px;background:var(--bg);border-radius:4px;font-family:var(--font-mono);font-size:11px;overflow-x:auto;max-height:300px;overflow-y:auto">${escapeHtml(data.raw_output)}</pre></details>`;
+    }
+
+    resultBox.innerHTML = `<div class="agentready-card">
+      <h4>Score Comparison</h4>
+      <div class="agentready-scores">
+        <div class="agentready-score-box">
+          <div class="label">Workstream</div>
+          <div class="value" style="color:${wsColor}">${workstreamScore}</div>
+        </div>
+        <div style="font-size:18px;color:var(--text-dim)">vs</div>
+        <div class="agentready-score-box">
+          <div class="label">agentready</div>
+          <div class="value" style="color:${arColor}">${agentreadyScore}${arGrade}</div>
+        </div>
+      </div>
+      ${failuresHtml}
+      ${passesHtml}
+      ${rawHtml}
+    </div>`;
+  } catch (err) {
+    resultBox.innerHTML = `<div class="agentready-card"><h4>agentready</h4><div style="color:var(--red);font-size:13px">Error: ${escapeHtml(err.message)}</div></div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run agentready';
+  }
+}
+
+async function deleteScanEntry(id) {
+  if (!confirm('Delete this scan result?')) return;
+  await fetch(`/api/readiness/history/${id}`, { method: 'DELETE' });
+  loadReadinessHistory();
+}
+
 async function loadReadinessHistory() {
   const container = document.getElementById('readinessHistory');
   try {
@@ -4619,7 +5002,7 @@ async function loadReadinessHistory() {
         <td style="font-family:var(--font-mono);color:var(--text-muted)">${r.scanned_at ? new Date(r.scanned_at).toLocaleDateString() : ''}</td>
         <td>
           <button class="history-rescan" onclick="document.getElementById('readinessRepoUrl').value='${escapeHtml(r.repo_url)}';scanReadiness()">Re-scan</button>
-          <button class="history-delete" onclick="deleteReadinessScan(${r.id})" title="Delete this scan">&times;</button>
+          <button class="history-delete" onclick="deleteScanEntry(${r.id})" title="Delete">&times;</button>
         </td>
       </tr>
     `).join('');
@@ -4634,14 +5017,6 @@ async function loadReadinessHistory() {
   }
 }
 
-async function deleteReadinessScan(scanId) {
-  if (!confirm('Delete this scan result?')) return;
-  try {
-    await fetch('/api/readiness/history/' + scanId, { method: 'DELETE' });
-    loadReadinessHistory();
-  } catch (err) { /* ignore */ }
-}
-
 // --- Agents Dashboard ---
 let _agentsData = [];
 let _agentsLoaded = false;
@@ -4649,9 +5024,9 @@ let _agentsLoaded = false;
 async function loadAgents() {
   if (_agentsLoaded && _agentsData.length) { renderAgents(_agentsData); loadTelemetry(); initAgentActivityFeed(); return; }
   const grid = document.getElementById('agentsGrid');
-  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Loading agents...</div>';
+  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Loading agents & checking health...</div>';
   try {
-    const resp = await fetch('/api/agents');
+    const resp = await fetch('/api/agents/refresh', { method: 'POST' });
     _agentsData = await resp.json();
     _agentsLoaded = true;
     renderAgents(_agentsData);
@@ -4936,6 +5311,372 @@ function renderTelemetry(data, container) {
         </table>
       </div>` : ''}
     </details>`;
+}
+
+// ---------------------------------------------------------------------------
+// AI Costs Tab
+// ---------------------------------------------------------------------------
+let _costChartTrend = null;
+let _costChartModel = null;
+
+async function loadAiCosts() {
+  const period = document.getElementById('costPeriodSelect')?.value || '30d';
+  try {
+    const resp = await fetch(`/api/ai/costs?period=${period}`);
+    const data = await resp.json();
+    renderCostTotals(data.totals);
+    renderCostTrendChart(data.daily || []);
+    renderCostModelChart(data.by_model || []);
+    renderCostModelTable(data.by_model || []);
+    renderCostFeatureTable(data.by_feature || []);
+    renderCostRecentEvents(data.recent_events || []);
+  } catch (e) {
+    console.error('Failed to load AI costs', e);
+  }
+}
+
+function renderCostTotals(t) {
+  const el = document.getElementById('costTotalsCards');
+  if (!el || !t) return;
+  el.innerHTML = `
+    <div class="cost-card"><div class="cost-label">Total Cost</div><div class="cost-value" style="color:var(--green)">$${t.total_cost?.toFixed(4) || '0'}</div><div class="cost-sub">${t.total_calls || 0} API calls</div></div>
+    <div class="cost-card"><div class="cost-label">Input Tokens</div><div class="cost-value">${fmtNum(t.total_input_tokens)}</div><div class="cost-sub">prompt tokens</div></div>
+    <div class="cost-card"><div class="cost-label">Output Tokens</div><div class="cost-value">${fmtNum(t.total_output_tokens)}</div><div class="cost-sub">completion tokens</div></div>
+    <div class="cost-card"><div class="cost-label">Avg Latency</div><div class="cost-value">${t.avg_latency_ms || 0}<span style="font-size:12px;font-weight:400">ms</span></div><div class="cost-sub">per request</div></div>
+  `;
+}
+
+function fmtNum(n) {
+  if (!n) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function renderCostTrendChart(daily) {
+  const canvas = document.getElementById('costTrendChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (_costChartTrend) { _costChartTrend.destroy(); _costChartTrend = null; }
+  if (!daily.length) { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='var(--text-muted)'; ctx.font='12px Inter'; ctx.fillText('No data yet',10,100); return; }
+
+  const sorted = [...daily].sort((a,b) => a.day.localeCompare(b.day));
+  const maxCost = Math.max(...sorted.map(d => d.cost_usd || 0), 0.001);
+  const w = canvas.width = canvas.parentElement.offsetWidth;
+  const h = 200;
+  canvas.height = h;
+  const pad = { t: 10, r: 10, b: 30, l: 50 };
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+  const barW = Math.max(4, Math.min(20, plotW / sorted.length - 2));
+
+  ctx.clearRect(0,0,w,h);
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+  ctx.fillStyle = textColor;
+  ctx.font = '10px JetBrains Mono';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + plotH - (plotH * i / 4);
+    ctx.fillText('$' + (maxCost * i / 4).toFixed(4), 2, y + 3);
+    ctx.strokeStyle = 'rgba(128,128,128,0.15)';
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+  }
+
+  sorted.forEach((d, i) => {
+    const x = pad.l + (i * (plotW / sorted.length)) + barW / 2;
+    const barH = (d.cost_usd / maxCost) * plotH;
+    ctx.fillStyle = 'rgba(108,92,231,0.7)';
+    ctx.fillRect(x, pad.t + plotH - barH, barW, barH);
+    if (sorted.length <= 14 || i % Math.ceil(sorted.length / 7) === 0) {
+      ctx.fillStyle = textColor;
+      ctx.save(); ctx.translate(x + barW/2, h - 4); ctx.rotate(-0.5); ctx.fillText(d.day.slice(5), 0, 0); ctx.restore();
+    }
+  });
+}
+
+function renderCostModelChart(models) {
+  const canvas = document.getElementById('costModelChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (_costChartModel) { _costChartModel.destroy(); _costChartModel = null; }
+  if (!models.length) { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle='var(--text-muted)'; ctx.font='12px Inter'; ctx.fillText('No data yet',10,100); return; }
+
+  const w = canvas.width = canvas.parentElement.offsetWidth;
+  const h = 200;
+  canvas.height = h;
+  const total = models.reduce((s,m) => s + (m.cost_usd || 0), 0) || 1;
+  const colors = ['#6c5ce7','#00b894','#fdcb6e','#e17055','#0984e3','#d63031','#e84393','#00cec9'];
+  const cx = w / 2, cy = h / 2, r = 70;
+  let angle = -Math.PI / 2;
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#888';
+
+  ctx.clearRect(0,0,w,h);
+  models.forEach((m, i) => {
+    const slice = (m.cost_usd / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, angle, angle + slice); ctx.closePath();
+    ctx.fillStyle = colors[i % colors.length]; ctx.fill();
+    if (slice > 0.15) {
+      const mid = angle + slice / 2;
+      const lx = cx + (r + 20) * Math.cos(mid);
+      const ly = cy + (r + 20) * Math.sin(mid);
+      ctx.fillStyle = textColor; ctx.font = '10px JetBrains Mono';
+      ctx.textAlign = mid > Math.PI/2 && mid < Math.PI*1.5 ? 'right' : 'left';
+      ctx.fillText(m.model || '?', lx, ly);
+    }
+    angle += slice;
+  });
+  ctx.beginPath(); ctx.arc(cx, cy, 35, 0, Math.PI * 2); ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#1a1a2e'; ctx.fill();
+  ctx.fillStyle = textColor; ctx.font = 'bold 12px JetBrains Mono'; ctx.textAlign = 'center'; ctx.fillText('$' + total.toFixed(3), cx, cy + 4);
+}
+
+function renderCostModelTable(models) {
+  const tbody = document.querySelector('#costModelTable tbody');
+  if (!tbody) return;
+  if (!models.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No AI usage recorded yet</td></tr>'; return; }
+  tbody.innerHTML = models.map(m => `<tr>
+    <td style="font-weight:600">${m.model || '-'}</td>
+    <td>${m.provider || '-'}</td>
+    <td>${m.calls}</td>
+    <td>${fmtNum(m.input_tokens)}</td>
+    <td>${fmtNum(m.output_tokens)}</td>
+    <td style="color:var(--green);font-weight:600">$${m.cost_usd?.toFixed(4) || '0'}</td>
+    <td>${m.avg_latency_ms}ms</td>
+  </tr>`).join('');
+}
+
+function renderCostFeatureTable(features) {
+  const tbody = document.querySelector('#costFeatureTable tbody');
+  if (!tbody) return;
+  if (!features.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">No data</td></tr>'; return; }
+  tbody.innerHTML = features.map(f => `<tr>
+    <td style="font-weight:600">${f.feature || '-'}</td>
+    <td>${f.calls}</td>
+    <td>${fmtNum(f.tokens)}</td>
+    <td style="color:var(--green);font-weight:600">$${f.cost_usd?.toFixed(4) || '0'}</td>
+  </tr>`).join('');
+}
+
+function renderCostRecentEvents(events) {
+  const el = document.getElementById('costRecentEvents');
+  if (!el) return;
+  if (!events.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">No AI events recorded yet. Run an AI review to see cost data here.</div>'; return; }
+  el.innerHTML = events.map(e => {
+    const ts = e.created_at ? new Date(e.created_at).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const status = e.status === 'success' ? '<span style="color:var(--green)">OK</span>' : '<span style="color:var(--red)">ERR</span>';
+    return `<div class="cost-event">
+      <span class="ce-time">${ts}</span>
+      <span class="ce-model">${e.model || e.agent_name || '-'}</span>
+      <span class="ce-tokens">${fmtNum(e.input_tokens || 0)} in / ${fmtNum(e.output_tokens || 0)} out</span>
+      <span class="ce-cost">$${(e.cost_usd || 0).toFixed(4)}</span>
+      <span>${e.latency_ms || 0}ms</span>
+      <span>${status}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleModelManager() {
+  const p = document.getElementById('modelManagerPanel');
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') loadModelRegistry();
+}
+
+async function loadModelRegistry() {
+  try {
+    const resp = await fetch('/api/ai/models');
+    const models = await resp.json();
+    const el = document.getElementById('modelRegistryList');
+    if (!el) return;
+    el.innerHTML = `<table class="cost-table"><thead><tr><th>Model</th><th>Provider</th><th>Display Name</th><th>$/M Input</th><th>$/M Output</th></tr></thead><tbody>` +
+      models.map(m => `<tr><td style="font-weight:600">${m.model_id}</td><td>${m.provider}</td><td>${m.display_name}</td><td>$${m.cost_per_million?.input?.toFixed(3) || '0'}</td><td>$${m.cost_per_million?.output?.toFixed(3) || '0'}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } catch (e) { console.error('Failed to load model registry', e); }
+}
+
+let _lastReport = { markdown: '', html: '', type: '' };
+
+async function generateReport() {
+  const type = document.getElementById('reportTypeSelect')?.value || 'weekly-digest';
+  const period = document.getElementById('costPeriodSelect')?.value || '30d';
+  const panel = document.getElementById('reportPanel');
+  const content = document.getElementById('reportContent');
+  const title = document.getElementById('reportTitle');
+  if (content) content.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted)">Generating report...</div>';
+  if (panel) panel.style.display = 'block';
+  try {
+    const resp = await fetch('/api/reports/generate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ type, period }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    _lastReport = { markdown: data.markdown || '', html: data.html || '', type };
+    if (title) title.textContent = type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    if (content) {
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width:100%;border:none;min-height:400px';
+      content.innerHTML = '';
+      content.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(data.html || '<p>No content</p>');
+      iframe.contentDocument.close();
+      iframe.onload = () => { iframe.style.height = iframe.contentDocument.body.scrollHeight + 20 + 'px'; };
+      setTimeout(() => { iframe.style.height = iframe.contentDocument.body.scrollHeight + 20 + 'px'; }, 200);
+    }
+  } catch (e) {
+    if (content) content.innerHTML = `<div style="padding:20px;color:var(--red)">Error: ${e.message}</div>`;
+  }
+}
+
+function copyReport(format) {
+  const text = format === 'html' ? _lastReport.html : _lastReport.markdown;
+  if (text) navigator.clipboard.writeText(text);
+}
+
+function downloadReport() {
+  if (!_lastReport.markdown) return;
+  const blob = new Blob([_lastReport.markdown], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `workstream-${_lastReport.type}-${new Date().toISOString().slice(0,10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function addModelPricing() {
+  const modelId = document.getElementById('newModelId')?.value?.trim();
+  if (!modelId) return;
+  try {
+    await fetch('/api/ai/models', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model_id: modelId,
+        provider: document.getElementById('newModelProvider')?.value?.trim() || '',
+        display_name: document.getElementById('newModelName')?.value?.trim() || '',
+        cost_input: parseFloat(document.getElementById('newModelCostIn')?.value) || 0,
+        cost_output: parseFloat(document.getElementById('newModelCostOut')?.value) || 0,
+      }),
+    });
+    loadModelRegistry();
+    ['newModelId','newModelProvider','newModelName','newModelCostIn','newModelCostOut'].forEach(id => { const e = document.getElementById(id); if(e) e.value = ''; });
+  } catch (e) { console.error('Failed to add model', e); }
+}
+
+// --- Claude Code Import ---
+function toggleClaudeCodeImport() {
+  const panel = document.getElementById('claudeCodePanel');
+  if (!panel) return;
+  const vis = panel.style.display === 'none';
+  panel.style.display = vis ? 'block' : 'none';
+  if (vis) loadClaudeCodeSessions();
+}
+
+async function loadClaudeCodeSessions() {
+  const container = document.getElementById('claudeCodeSessions');
+  if (!container) return;
+  container.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Scanning ~/.claude/ ...</div>';
+  try {
+    const resp = await fetch('/api/ai/claude-code/sessions');
+    const sessions = await resp.json();
+    if (!sessions.length) {
+      container.innerHTML = '<div style="color:var(--text-muted);font-size:12px">No Claude Code sessions found in ~/.claude/projects/</div>';
+      return;
+    }
+    let html = '<table class="cost-table"><thead><tr><th>Session</th><th>Project</th><th>Size</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+    for (const s of sessions) {
+      const status = s.imported
+        ? '<span style="color:#22c55e">Imported</span>'
+        : '<span style="color:var(--text-muted)">Not imported</span>';
+      const btn = s.imported
+        ? '<span style="color:var(--text-muted);font-size:11px">Done</span>'
+        : `<button class="readiness-scan-btn" onclick="importClaudeSession('${s.session_id}','${s.path.replace(/'/g, "\\'")}')" style="font-size:11px;padding:2px 8px">Import</button>`;
+      html += `<tr><td style="font-family:monospace;font-size:11px">${s.session_id.slice(0,12)}...</td><td>${s.project}</td><td>${s.size_mb} MB</td><td>${status}</td><td>${btn}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div style="color:#ef4444;font-size:12px">Failed to scan: ' + e.message + '</div>';
+  }
+}
+
+async function importClaudeSession(sessionId, path) {
+  const result = document.getElementById('claudeImportResult');
+  if (result) { result.style.display = 'block'; result.innerHTML = 'Importing...'; result.style.background = 'var(--bg)'; result.style.color = 'var(--text)'; }
+  try {
+    const resp = await fetch('/api/ai/claude-code/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ session_id: sessionId, path }),
+    });
+    const data = await resp.json();
+    if (data.status === 'imported') {
+      if (result) { result.style.background = '#14532d'; result.style.color = '#86efac'; result.innerHTML = `Imported ${data.events} events | ${data.total_tokens.toLocaleString()} tokens | $${data.total_cost_usd.toFixed(4)}`; }
+      loadClaudeCodeSessions();
+      loadAiCosts();
+    } else {
+      if (result) { result.style.background = '#422006'; result.style.color = '#fbbf24'; result.innerHTML = `Skipped: ${data.reason}`; }
+    }
+  } catch (e) {
+    if (result) { result.style.background = '#450a0a'; result.style.color = '#fca5a5'; result.innerHTML = 'Error: ' + e.message; }
+  }
+}
+
+async function importAllClaudeSessions() {
+  const result = document.getElementById('claudeImportResult');
+  if (result) { result.style.display = 'block'; result.innerHTML = 'Importing all sessions...'; result.style.background = 'var(--bg)'; result.style.color = 'var(--text)'; }
+  try {
+    const resp = await fetch('/api/ai/claude-code/import', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ all: true }),
+    });
+    const data = await resp.json();
+    if (result) {
+      result.style.background = '#14532d'; result.style.color = '#86efac';
+      result.innerHTML = `Found ${data.sessions_found} sessions | Imported ${data.events_imported} events | Total cost: $${data.total_cost_usd.toFixed(4)}`;
+    }
+    loadClaudeCodeSessions();
+    loadAiCosts();
+  } catch (e) {
+    if (result) { result.style.background = '#450a0a'; result.style.color = '#fca5a5'; result.innerHTML = 'Error: ' + e.message; }
+  }
+}
+
+// --- Manual Cost Entry ---
+function toggleManualCost() {
+  const panel = document.getElementById('manualCostPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  const dateInput = document.getElementById('manualDate');
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+}
+
+async function addManualCost() {
+  const source = document.getElementById('manualSource')?.value || 'Other';
+  const cost = parseFloat(document.getElementById('manualCost')?.value);
+  if (!cost || cost <= 0) { alert('Please enter a cost > 0'); return; }
+  try {
+    const resp = await fetch('/api/ai/costs/manual', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        source,
+        cost_usd: cost,
+        note: document.getElementById('manualNote')?.value || '',
+        date: (document.getElementById('manualDate')?.value || new Date().toISOString().slice(0,10)) + 'T12:00:00Z',
+      }),
+    });
+    const data = await resp.json();
+    if (data.status === 'recorded') {
+      document.getElementById('manualCost').value = '';
+      document.getElementById('manualNote').value = '';
+      loadAiCosts();
+    } else {
+      alert(data.error || 'Failed to record');
+    }
+  } catch (e) { alert('Error: ' + e.message); }
 }
 </script>
 

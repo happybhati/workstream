@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import logging.handlers
-import os
 import signal
 import sys
 from contextlib import asynccontextmanager
@@ -78,6 +78,12 @@ async def _poll_loop() -> None:
 async def lifespan(app: FastAPI):
     global poll_task
     await init_db()
+
+    from agents.a2a_servers import start_a2a_agents, stop_a2a_agents
+
+    start_a2a_agents()
+    await asyncio.sleep(0.5)
+
     poll_task = asyncio.create_task(_poll_loop())
     logger.info(
         "Workstream started -- polling every %ds. Open http://localhost:8080",
@@ -90,29 +96,10 @@ async def lifespan(app: FastAPI):
             await poll_task
         except asyncio.CancelledError:
             pass
+    stop_a2a_agents()
 
 
 app = FastAPI(title="Workstream", lifespan=lifespan)
-
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    """Optional bearer-token gate. Active only when WORKSTREAM_AUTH_TOKEN is set."""
-    token = os.getenv("WORKSTREAM_AUTH_TOKEN", "")
-    if not token:
-        return await call_next(request)
-
-    if request.url.path in ("/api/health",):
-        return await call_next(request)
-
-    auth_header = request.headers.get("authorization", "")
-    query_token = request.query_params.get("token", "")
-
-    if auth_header == f"Bearer {token}" or query_token == token:
-        return await call_next(request)
-
-    return JSONResponse({"error": "unauthorized"}, status_code=401)
-
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -120,12 +107,6 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.get("/")
 async def index():
     return FileResponse(str(STATIC_DIR / "index.html"))
-
-
-@app.get("/api/health")
-async def api_health():
-    """Health check endpoint for container orchestration and monitoring."""
-    return JSONResponse({"status": "ok"})
 
 
 @app.get("/api/config")
@@ -424,7 +405,8 @@ async def api_readiness_history():
 
 
 @app.delete("/api/readiness/history/{scan_id}")
-async def api_delete_readiness_scan(scan_id: int):
+async def api_readiness_delete(scan_id: int):
+    """Delete a single scan from history."""
     from database import delete_readiness_scan
 
     deleted = await delete_readiness_scan(scan_id)
@@ -434,15 +416,113 @@ async def api_delete_readiness_scan(scan_id: int):
 
 
 @app.post("/api/readiness/history/delete-bulk")
-async def api_delete_readiness_scans_bulk(request: Request):
+async def api_readiness_delete_bulk(request: Request):
+    """Delete multiple scans from history."""
     from database import delete_readiness_scans_bulk
 
     body = await request.json()
-    scan_ids = body.get("ids", [])
-    if not scan_ids:
+    ids = body.get("ids", [])
+    if not ids:
         return JSONResponse({"error": "ids list is required"}, status_code=400)
-    count = await delete_readiness_scans_bulk(scan_ids)
+    count = await delete_readiness_scans_bulk([int(i) for i in ids])
     return JSONResponse({"deleted": count})
+
+
+@app.post("/api/readiness/agentready")
+async def api_readiness_agentready(request: Request):
+    """Run the ambient-code/agentready CLI against a repo and return results."""
+    import asyncio
+    import re
+    import shutil
+    import tempfile
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required"}, status_code=400)
+
+    agentready_bin = shutil.which("agentready")
+    if not agentready_bin:
+        return JSONResponse(
+            {
+                "installed": False,
+                "error": "agentready CLI not found. Install with: pip install agentready",
+                "install_command": "pip install agentready",
+            },
+            status_code=200,
+        )
+
+    tmpdir = None
+    try:
+        tmpdir = tempfile.mkdtemp(prefix="agentready-")
+        clone_proc = await asyncio.create_subprocess_exec(
+            "git",
+            "clone",
+            "--depth=1",
+            repo_url,
+            tmpdir + "/repo",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(clone_proc.communicate(), timeout=60)
+        if clone_proc.returncode != 0:
+            return JSONResponse({"error": f"Failed to clone {repo_url}"}, status_code=400)
+
+        proc = await asyncio.create_subprocess_exec(
+            agentready_bin,
+            "assess",
+            tmpdir + "/repo",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        output = stdout.decode("utf-8", errors="replace")
+        err_output = stderr.decode("utf-8", errors="replace")
+
+        score = None
+        grade = None
+        failures = []
+        passes = []
+
+        for line in output.splitlines():
+            stripped = line.strip()
+
+            m = re.search(r"Score:\s*(\d+(?:\.\d+)?)/100\s*\((\w+)\)", stripped)
+            if m:
+                score = float(m.group(1))
+                grade = m.group(2)
+                continue
+
+            if "FAIL" in stripped and "---" not in stripped:
+                parts = re.split(r"\s{2,}", stripped)
+                if len(parts) >= 2:
+                    failures.append({"test": parts[0], "notes": parts[-1] if len(parts) >= 3 else ""})
+
+            if "PASS" in stripped and "---" not in stripped:
+                parts = re.split(r"\s{2,}", stripped)
+                if len(parts) >= 2:
+                    passes.append({"test": parts[0], "notes": parts[-1] if len(parts) >= 3 else ""})
+
+        return JSONResponse(
+            {
+                "installed": True,
+                "repo_url": repo_url,
+                "score": score,
+                "grade": grade,
+                "failures": failures,
+                "passes": passes,
+                "raw_output": output,
+                "stderr": err_output if err_output else None,
+                "exit_code": proc.returncode,
+            }
+        )
+    except asyncio.TimeoutError:
+        return JSONResponse({"error": "agentready timed out after 120 seconds"}, status_code=504)
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+    finally:
+        if tmpdir:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @app.get("/api/intelligence/stats")
@@ -580,6 +660,24 @@ async def api_intelligence_repo(owner: str, repo: str):
     return JSONResponse(intel)
 
 
+@app.post("/api/intelligence/summarize")
+async def api_intelligence_summarize(request: Request):
+    """Generate an AI-powered narrative summary of review patterns for a repo."""
+    from intelligence.analyzer import summarize_patterns_with_llm
+
+    body = await request.json()
+    repo = body.get("repo", "").strip()
+    provider = body.get("provider", "claude")
+    if not repo:
+        return JSONResponse({"error": "repo is required"}, status_code=400)
+    try:
+        result = await summarize_patterns_with_llm(repo, provider=provider)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.exception("Intelligence LLM summary failed for %s", repo)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
 @app.get("/api/intelligence/repos")
 async def api_intelligence_repos():
     """Return list of repos with collection stats."""
@@ -676,6 +774,177 @@ async def api_telemetry_summary():
     return JSONResponse(get_telemetry_summary())
 
 
+# ---------------------------------------------------------------------------
+# AI Cost Analytics endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/ai/costs")
+async def api_ai_costs(period: str = "30d"):
+    """Return AI cost analytics: totals, per-model, per-feature, daily trends."""
+    from database import get_ai_cost_summary
+
+    if period not in ("7d", "30d", "90d", "all"):
+        period = "30d"
+    summary = await get_ai_cost_summary(period)
+    return JSONResponse(summary)
+
+
+@app.get("/api/ai/models")
+async def api_ai_models():
+    """List all known models with pricing."""
+    from model_registry import list_models
+
+    return JSONResponse(list_models())
+
+
+@app.post("/api/ai/models")
+async def api_ai_models_upsert(request: Request):
+    """Add or update a custom model pricing entry."""
+    from model_registry import upsert_model
+
+    body = await request.json()
+    model_id = body.get("model_id", "").strip()
+    if not model_id:
+        return JSONResponse({"error": "model_id is required"}, status_code=400)
+    result = upsert_model(
+        model_id=model_id,
+        provider=body.get("provider", ""),
+        display_name=body.get("display_name", ""),
+        cost_input=float(body.get("cost_input", 0)),
+        cost_output=float(body.get("cost_output", 0)),
+    )
+    return JSONResponse(result)
+
+
+@app.delete("/api/ai/models/{model_id:path}")
+async def api_ai_models_delete(model_id: str):
+    """Remove a custom model pricing override."""
+    from model_registry import delete_model
+
+    if delete_model(model_id):
+        return JSONResponse({"status": "deleted"})
+    return JSONResponse({"error": "Model override not found"}, status_code=404)
+
+
+# ---------------------------------------------------------------------------
+# Report Generation endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/reports/generate")
+async def api_reports_generate(request: Request):
+    """Generate a Markdown/HTML report. type: weekly-digest | cost-summary | review-summary."""
+    from reports import generate_cost_report, generate_review_summary, generate_weekly_digest
+
+    body = await request.json()
+    report_type = body.get("type", "weekly-digest")
+    period = body.get("period", "30d")
+    try:
+        if report_type == "weekly-digest":
+            result = await generate_weekly_digest()
+        elif report_type == "cost-summary":
+            result = await generate_cost_report(period=period)
+        elif report_type == "review-summary":
+            result = await generate_review_summary()
+        else:
+            return JSONResponse({"error": f"Unknown report type: {report_type}"}, status_code=400)
+        return JSONResponse({"type": report_type, **result})
+    except Exception as exc:
+        logger.exception("Report generation failed for type=%s", report_type)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# Claude Code Import & Manual Cost Entry
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/ai/claude-code/sessions")
+async def api_claude_code_sessions():
+    """List discoverable Claude Code sessions with import status."""
+    from claude_code_importer import _get_imported_sessions, discover_sessions
+
+    sessions = discover_sessions()
+    imported = _get_imported_sessions(settings.db_path)
+    for s in sessions:
+        s["imported"] = s["session_id"] in imported
+    return JSONResponse(sessions)
+
+
+@app.post("/api/ai/claude-code/import")
+async def api_claude_code_import(request: Request):
+    """Import Claude Code session data. Body: {session_id, path} or {all: true}."""
+    from claude_code_importer import import_all_sessions, import_session
+
+    body = await request.json()
+    try:
+        if body.get("all"):
+            result = import_all_sessions()
+        else:
+            sid = body.get("session_id", "")
+            path = body.get("path", "")
+            if not sid or not path:
+                return JSONResponse(
+                    {"error": "session_id and path are required"},
+                    status_code=400,
+                )
+            result = import_session(sid, path)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.exception("Claude Code import failed")
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.get("/api/ai/claude-code/stats")
+async def api_claude_code_stats():
+    """Quick overview from Claude Code stats-cache.json."""
+    from claude_code_importer import get_stats_summary
+
+    return JSONResponse(get_stats_summary())
+
+
+@app.post("/api/ai/costs/manual")
+async def api_ai_costs_manual(request: Request):
+    """Record a manual cost entry (e.g. Cursor subscription, ChatGPT usage)."""
+    from datetime import datetime, timezone
+
+    from database import insert_telemetry_event
+
+    body = await request.json()
+    source = body.get("source", "").strip()
+    cost = float(body.get("cost_usd", 0))
+    if not source or cost <= 0:
+        return JSONResponse(
+            {"error": "source and cost_usd (>0) are required"},
+            status_code=400,
+        )
+    event = {
+        "agent_name": "manual-entry",
+        "operation": "external-cost",
+        "provider": body.get("provider", source.lower()),
+        "model": body.get("model", ""),
+        "input_tokens": int(body.get("input_tokens", 0)),
+        "output_tokens": int(body.get("output_tokens", 0)),
+        "total_tokens": int(body.get("input_tokens", 0)) + int(body.get("output_tokens", 0)),
+        "cost_usd": cost,
+        "latency_ms": 0,
+        "feature": source,
+        "status": "success",
+        "error": "",
+        "metadata": json.dumps(
+            {
+                "source": source,
+                "note": body.get("note", ""),
+                "manual": True,
+            }
+        ),
+        "created_at": body.get("date", datetime.now(timezone.utc).isoformat()),
+    }
+    row_id = await insert_telemetry_event(event)
+    return JSONResponse({"status": "recorded", "id": row_id, "cost_usd": cost})
+
+
 @app.get("/api/agents/activity/recent")
 async def api_agents_activity_recent():
     """Return recent agent activity events."""
@@ -718,6 +987,8 @@ async def api_agents_activity_stream():
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
 
     def _handle_signal(signum, _frame):
@@ -728,7 +999,5 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    host = os.getenv("WORKSTREAM_HOST", "127.0.0.1")
-    port = int(os.getenv("WORKSTREAM_PORT", "8080"))
-    logger.info("Workstream PID %d starting on http://%s:%d", os.getpid(), host, port)
-    uvicorn.run("app:app", host=host, port=port)
+    logger.info("Workstream PID %d starting on http://localhost:8080", os.getpid())
+    uvicorn.run("app:app", host="0.0.0.0", port=8080)
