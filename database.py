@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS pull_requests (
     approved_by TEXT DEFAULT '',            -- comma-separated approver usernames
     polled_at TEXT DEFAULT '',              -- ISO timestamp of last poll that saw this PR
     ci_checks TEXT DEFAULT '',             -- JSON array of individual check run details
-    author_avatar TEXT DEFAULT ''          -- URL to author's avatar image
+    author_avatar TEXT DEFAULT '',         -- URL to author's avatar image
+    my_last_review_at TEXT DEFAULT '',     -- ISO timestamp of user's last submitted review
+    commits_since_review INTEGER DEFAULT 0,
+    comments_since_review INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS activities (
@@ -220,6 +223,10 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE pull_requests ADD COLUMN ci_checks TEXT DEFAULT ''")
         if "author_avatar" not in pr_cols:
             await db.execute("ALTER TABLE pull_requests ADD COLUMN author_avatar TEXT DEFAULT ''")
+        if "my_last_review_at" not in pr_cols:
+            await db.execute("ALTER TABLE pull_requests ADD COLUMN my_last_review_at TEXT DEFAULT ''")
+            await db.execute("ALTER TABLE pull_requests ADD COLUMN commits_since_review INTEGER DEFAULT 0")
+            await db.execute("ALTER TABLE pull_requests ADD COLUMN comments_since_review INTEGER DEFAULT 0")
         # node_id for comment deduplication
         cursor = await db.execute("PRAGMA table_info(ri_review_comments)")
         ri_cols = {row[1] for row in await cursor.fetchall()}
@@ -246,6 +253,9 @@ async def upsert_pr(pr: dict) -> None:
     pr.setdefault("approved_by", "")
     pr.setdefault("ci_checks", "")
     pr.setdefault("author_avatar", "")
+    pr.setdefault("my_last_review_at", "")
+    pr.setdefault("commits_since_review", 0)
+    pr.setdefault("comments_since_review", 0)
     pr["polled_at"] = datetime.now(timezone.utc).isoformat()
     db = await get_db()
     try:
@@ -255,12 +265,12 @@ async def upsert_pr(pr: dict) -> None:
                 is_draft, url, created_at, updated_at, ci_status,
                 review_requested_from, assigned_to, jira_key, additions, deletions,
                 comments_count, review_state, approved_by, polled_at, ci_checks,
-                author_avatar)
+                author_avatar, my_last_review_at, commits_since_review, comments_since_review)
                VALUES (:id, :platform, :repo_full_name, :number, :title, :author,
                        :state, :is_draft, :url, :created_at, :updated_at, :ci_status,
                        :review_requested_from, :assigned_to, :jira_key, :additions, :deletions,
                        :comments_count, :review_state, :approved_by, :polled_at, :ci_checks,
-                       :author_avatar)
+                       :author_avatar, :my_last_review_at, :commits_since_review, :comments_since_review)
                ON CONFLICT(id) DO UPDATE SET
                    title=excluded.title, state=excluded.state, is_draft=excluded.is_draft,
                    updated_at=excluded.updated_at, ci_status=excluded.ci_status,
@@ -272,7 +282,10 @@ async def upsert_pr(pr: dict) -> None:
                    approved_by=CASE WHEN excluded.approved_by != '' THEN excluded.approved_by ELSE pull_requests.approved_by END,
                    polled_at=excluded.polled_at,
                    ci_checks=CASE WHEN excluded.ci_checks != '' THEN excluded.ci_checks ELSE pull_requests.ci_checks END,
-                   author_avatar=CASE WHEN excluded.author_avatar != '' THEN excluded.author_avatar ELSE pull_requests.author_avatar END
+                   author_avatar=CASE WHEN excluded.author_avatar != '' THEN excluded.author_avatar ELSE pull_requests.author_avatar END,
+                   my_last_review_at=CASE WHEN excluded.my_last_review_at != '' THEN excluded.my_last_review_at ELSE pull_requests.my_last_review_at END,
+                   commits_since_review=excluded.commits_since_review,
+                   comments_since_review=excluded.comments_since_review
             """,
             pr,
         )
