@@ -31,12 +31,10 @@ from database import (
 from pollers import poll_all
 from reviewer import (
     build_copy_prompt,
-    build_review_prompt,
     fetch_pr_diff,
     get_available_providers,
     post_review,
     review_pr,
-    sanitize_diff,
 )
 
 LOG_DIR = settings.log_dir
@@ -332,21 +330,23 @@ async def api_readiness_scan(request: Request):
         scan_result = await scan_repo(repo_url)
         score_result = score_repo(scan_result)
 
-        await insert_readiness_scan({
-            "repo_url": repo_url,
-            "owner": scan_result["owner"],
-            "repo": scan_result["repo"],
-            "score_total": score_result["total"],
-            "score_agent_config": score_result["categories"]["agent_config"]["score"],
-            "score_documentation": score_result["categories"]["documentation"]["score"],
-            "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
-            "score_code_structure": score_result["categories"]["code_structure"]["score"],
-            "score_security": score_result["categories"]["security"]["score"],
-            "score_fullsend": score_result["categories"].get("fullsend_readiness", {}).get("score", 0),
-            "grade": score_result["grade"],
-            "findings": json.dumps(score_result),
-            "scanned_at": scan_result["scanned_at"],
-        })
+        await insert_readiness_scan(
+            {
+                "repo_url": repo_url,
+                "owner": scan_result["owner"],
+                "repo": scan_result["repo"],
+                "score_total": score_result["total"],
+                "score_agent_config": score_result["categories"]["agent_config"]["score"],
+                "score_documentation": score_result["categories"]["documentation"]["score"],
+                "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
+                "score_code_structure": score_result["categories"]["code_structure"]["score"],
+                "score_security": score_result["categories"]["security"]["score"],
+                "score_fullsend": score_result["categories"].get("fullsend_readiness", {}).get("score", 0),
+                "grade": score_result["grade"],
+                "findings": json.dumps(score_result),
+                "scanned_at": scan_result["scanned_at"],
+            }
+        )
 
         return JSONResponse(
             {
@@ -421,6 +421,28 @@ async def api_readiness_history():
 
     rows = await get_readiness_history()
     return JSONResponse(rows)
+
+
+@app.delete("/api/readiness/history/{scan_id}")
+async def api_delete_readiness_scan(scan_id: int):
+    from database import delete_readiness_scan
+
+    deleted = await delete_readiness_scan(scan_id)
+    if not deleted:
+        return JSONResponse({"error": "Scan not found"}, status_code=404)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/readiness/history/delete-bulk")
+async def api_delete_readiness_scans_bulk(request: Request):
+    from database import delete_readiness_scans_bulk
+
+    body = await request.json()
+    scan_ids = body.get("ids", [])
+    if not scan_ids:
+        return JSONResponse({"error": "ids list is required"}, status_code=400)
+    count = await delete_readiness_scans_bulk(scan_ids)
+    return JSONResponse({"deleted": count})
 
 
 @app.get("/api/intelligence/stats")

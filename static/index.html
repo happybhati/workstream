@@ -2637,6 +2637,12 @@ header .actions {
   transition: all 0.2s;
 }
 .history-rescan:hover { border-color: var(--accent); color: var(--accent); }
+.history-delete {
+  background: none; border: 1px solid transparent; color: var(--text-dim);
+  padding: 2px 6px; border-radius: 4px; font-size: 14px; cursor: pointer;
+  margin-left: 4px; transition: all 0.2s; line-height: 1;
+}
+.history-delete:hover { color: var(--red); border-color: var(--red); }
 
 .readiness-spinner {
   display: flex;
@@ -4597,7 +4603,10 @@ async function loadReadinessHistory() {
         <td><span class="history-grade grade-${r.grade}">${r.grade}</span></td>
         <td style="font-family:var(--font-mono)">${r.score_total}/100</td>
         <td style="font-family:var(--font-mono);color:var(--text-muted)">${r.scanned_at ? new Date(r.scanned_at).toLocaleDateString() : ''}</td>
-        <td><button class="history-rescan" onclick="document.getElementById('readinessRepoUrl').value='${escapeHtml(r.repo_url)}';scanReadiness()">Re-scan</button></td>
+        <td>
+          <button class="history-rescan" onclick="document.getElementById('readinessRepoUrl').value='${escapeHtml(r.repo_url)}';scanReadiness()">Re-scan</button>
+          <button class="history-delete" onclick="deleteReadinessScan(${r.id})" title="Delete this scan">&times;</button>
+        </td>
       </tr>
     `).join('');
     container.innerHTML = `
@@ -4609,6 +4618,14 @@ async function loadReadinessHistory() {
   } catch (err) {
     container.innerHTML = '';
   }
+}
+
+async function deleteReadinessScan(scanId) {
+  if (!confirm('Delete this scan result?')) return;
+  try {
+    await fetch('/api/readiness/history/' + scanId, { method: 'DELETE' });
+    loadReadinessHistory();
+  } catch (err) { /* ignore */ }
 }
 
 // --- Agents Dashboard ---
