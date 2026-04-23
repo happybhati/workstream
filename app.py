@@ -79,10 +79,14 @@ async def lifespan(app: FastAPI):
     global poll_task
     await init_db()
 
-    from agents.a2a_servers import start_a2a_agents, stop_a2a_agents
+    try:
+        from agents.a2a_servers import start_a2a_agents, stop_a2a_agents
 
-    start_a2a_agents()
-    await asyncio.sleep(0.5)
+        start_a2a_agents()
+        await asyncio.sleep(0.5)
+    except ImportError:
+        stop_a2a_agents = None
+        logger.debug("agents.a2a_servers not available, skipping A2A agent startup")
 
     poll_task = asyncio.create_task(_poll_loop())
     logger.info(
@@ -96,7 +100,8 @@ async def lifespan(app: FastAPI):
             await poll_task
         except asyncio.CancelledError:
             pass
-    stop_a2a_agents()
+    if stop_a2a_agents:
+        stop_a2a_agents()
 
 
 app = FastAPI(title="Workstream", lifespan=lifespan)
