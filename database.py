@@ -679,3 +679,26 @@ async def get_readiness_history(limit: int = 50) -> list[dict]:
         return [dict(r) for r in rows]
     finally:
         await db.close()
+
+
+async def delete_readiness_scan(scan_id: int) -> bool:
+    db = await get_db()
+    try:
+        cursor = await db.execute("DELETE FROM readiness_scans WHERE id = :id", {"id": scan_id})
+        await db.commit()
+        return cursor.rowcount > 0
+    finally:
+        await db.close()
+
+
+async def delete_readiness_scans_bulk(scan_ids: list[int]) -> int:
+    if not scan_ids:
+        return 0
+    db = await get_db()
+    try:
+        placeholders = ",".join("?" for _ in scan_ids)
+        cursor = await db.execute(f"DELETE FROM readiness_scans WHERE id IN ({placeholders})", scan_ids)
+        await db.commit()
+        return cursor.rowcount
+    finally:
+        await db.close()
