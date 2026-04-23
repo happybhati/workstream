@@ -135,15 +135,46 @@ async def _fetch_github_diff(repo: str, number: int) -> tuple[str, dict]:
         )
         diff_resp.raise_for_status()
 
+        files_resp = await client.get(
+            f"/repos/{repo}/pulls/{number}/files",
+            params={"per_page": 100},
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        changed_files_list = []
+        if files_resp.status_code == 200:
+            for f in files_resp.json():
+                changed_files_list.append({
+                    "filename": f.get("filename", ""),
+                    "status": f.get("status", ""),
+                    "additions": f.get("additions", 0),
+                    "deletions": f.get("deletions", 0),
+                })
+
+    labels = [l.get("name", "") for l in pr_data.get("labels", [])]
+    reviewers = [r.get("login", "") for r in pr_data.get("requested_reviewers", [])]
+    assignees = [a.get("login", "") for a in pr_data.get("assignees", [])]
+    milestone = (pr_data.get("milestone") or {}).get("title", "")
+
     metadata = {
         "title": pr_data.get("title", ""),
-        "body": (pr_data.get("body") or "")[:2000],
+        "body": (pr_data.get("body") or "")[:3000],
         "author": pr_data.get("user", {}).get("login", ""),
         "base": pr_data.get("base", {}).get("ref", ""),
         "head": pr_data.get("head", {}).get("ref", ""),
         "additions": pr_data.get("additions", 0),
         "deletions": pr_data.get("deletions", 0),
         "changed_files": pr_data.get("changed_files", 0),
+        "url": pr_data.get("html_url", f"https://github.com/{repo}/pull/{number}"),
+        "state": pr_data.get("state", ""),
+        "draft": pr_data.get("draft", False),
+        "labels": labels,
+        "reviewers": reviewers,
+        "assignees": assignees,
+        "milestone": milestone,
+        "created_at": pr_data.get("created_at", ""),
+        "updated_at": pr_data.get("updated_at", ""),
+        "commits": pr_data.get("commits", 0),
+        "changed_files_list": changed_files_list,
     }
     return diff_resp.text, metadata
 
@@ -178,15 +209,40 @@ async def _fetch_gitlab_diff(repo: str, number: int) -> tuple[str, dict]:
         diff_text_parts.append(header + d.get("diff", ""))
     diff_text = "\n".join(diff_text_parts)
 
+    labels = mr_data.get("labels", [])
+    reviewers = [r.get("username", "") for r in mr_data.get("reviewers", [])]
+    assignees = [a.get("username", "") for a in mr_data.get("assignees", [])]
+    milestone = (mr_data.get("milestone") or {}).get("title", "")
+
+    changed_files_list = []
+    for d in diffs_list:
+        changed_files_list.append({
+            "filename": d.get("new_path", d.get("old_path", "")),
+            "status": "renamed" if d.get("renamed_file") else ("added" if d.get("new_file") else ("removed" if d.get("deleted_file") else "modified")),
+            "additions": 0,
+            "deletions": 0,
+        })
+
     metadata = {
         "title": mr_data.get("title", ""),
-        "body": (mr_data.get("description") or "")[:2000],
+        "body": (mr_data.get("description") or "")[:3000],
         "author": mr_data.get("author", {}).get("username", ""),
         "base": mr_data.get("target_branch", ""),
         "head": mr_data.get("source_branch", ""),
         "additions": 0,
         "deletions": 0,
         "changed_files": len(diffs_list),
+        "url": mr_data.get("web_url", ""),
+        "state": mr_data.get("state", ""),
+        "draft": mr_data.get("draft", False),
+        "labels": labels,
+        "reviewers": reviewers,
+        "assignees": assignees,
+        "milestone": milestone,
+        "created_at": mr_data.get("created_at", ""),
+        "updated_at": mr_data.get("updated_at", ""),
+        "commits": 0,
+        "changed_files_list": changed_files_list,
     }
     return diff_text, metadata
 
@@ -320,31 +376,104 @@ def _get_team_context(pr_id: str) -> str:
         return ""
 
 
-def build_review_prompt(metadata: dict, diff: str, pr_id: str = "") -> tuple[str, str]:
-    """Return (system_prompt, user_prompt).
-
-    If pr_id is provided and review intelligence data exists, the prompt
-    is enriched with team context, patterns, and reviewer expectations.
-    """
+def _build_pr_context(metadata: dict, pr_id: str = "") -> str:
+    """Build the rich PR context block shared by both prompt modes."""
     team_context = _get_team_context(pr_id) if pr_id else ""
+
+    lines = [
+        f"## Pull Request: {metadata.get('title', '')}",
+        "",
+        f"**URL:** {metadata.get('url', '')}",
+        f"**Author:** {metadata.get('author', '')}",
+        f"**Branch:** `{metadata.get('head', '')}` → `{metadata.get('base', '')}`",
+        f"**State:** {metadata.get('state', 'open')}{' (draft)' if metadata.get('draft') else ''}",
+    ]
+
+    if metadata.get("labels"):
+        lines.append(f"**Labels:** {', '.join(metadata['labels'])}")
+    if metadata.get("reviewers"):
+        lines.append(f"**Reviewers:** {', '.join(metadata['reviewers'])}")
+    if metadata.get("assignees"):
+        lines.append(f"**Assignees:** {', '.join(metadata['assignees'])}")
+    if metadata.get("milestone"):
+        lines.append(f"**Milestone:** {metadata['milestone']}")
+
+    lines.append(
+        f"**Stats:** {metadata.get('changed_files', '?')} files changed, "
+        f"+{metadata.get('additions', '?')} −{metadata.get('deletions', '?')}, "
+        f"{metadata.get('commits', '?')} commit(s)"
+    )
+
+    if metadata.get("created_at"):
+        lines.append(f"**Created:** {metadata['created_at'][:10]}  |  **Updated:** {metadata.get('updated_at', '')[:10]}")
+
+    lines.append("")
+
+    body = metadata.get("body", "").strip()
+    if body:
+        lines += ["### Description", "", body, ""]
+    else:
+        lines += ["### Description", "", "*No description provided.*", ""]
+
+    changed_files_list = metadata.get("changed_files_list", [])
+    if changed_files_list:
+        lines += ["### Changed Files", ""]
+        for f in changed_files_list[:50]:
+            status_icon = {"added": "+", "removed": "-", "modified": "~", "renamed": "→"}.get(f.get("status", ""), "~")
+            stat = ""
+            if f.get("additions") or f.get("deletions"):
+                stat = f" (+{f['additions']} −{f['deletions']})"
+            lines.append(f"- `[{status_icon}]` `{f['filename']}`{stat}")
+        if len(changed_files_list) > 50:
+            lines.append(f"- ... and {len(changed_files_list) - 50} more files")
+        lines.append("")
+
+    if team_context:
+        lines.append(team_context)
+
+    return "\n".join(lines)
+
+
+def build_review_prompt(metadata: dict, diff: str, pr_id: str = "") -> tuple[str, str]:
+    """Return (system_prompt, user_prompt) for internal AI review (includes diff)."""
+    context = _build_pr_context(metadata, pr_id)
 
     user_prompt = f"""\
 Review the following pull request.
 
-**Title:** {metadata.get("title", "")}
-**Author:** {metadata.get("author", "")}
-**Branch:** {metadata.get("head", "")} → {metadata.get("base", "")}
-**Files changed:** {metadata.get("changed_files", "?")} | \
-+{metadata.get("additions", "?")} −{metadata.get("deletions", "?")}
+{context}
+### Diff
 
-**Description:**
-{metadata.get("body", "No description provided.")}
-{team_context}
-**Diff:**
+
 ```
 {diff[:80000]}
 ```"""
     return SYSTEM_PROMPT, user_prompt
+
+
+def build_copy_prompt(metadata: dict, pr_id: str = "") -> str:
+    """Build a clean prompt for copying into external AI tools (no raw diff).
+
+    The prompt includes the PR URL so the AI tool can fetch the diff itself
+    using GitHub MCP, CLI, or web browsing.
+    """
+    context = _build_pr_context(metadata, pr_id)
+
+    return f"""\
+You are an expert senior software engineer. Please review this pull request thoroughly.
+
+{context}
+### Instructions
+
+1. **Open the PR** at the URL above and read the full diff.
+2. Focus on: correctness, security, reliability, edge cases, error handling, and test coverage.
+3. Do NOT comment on style or formatting unless it causes a real bug.
+4. For each issue found, specify the file, line, severity (critical/warning/suggestion), and a concrete fix.
+5. If the PR looks good, say so with a brief positive summary.
+
+Please provide your review with:
+- A 2-3 sentence overall assessment
+- Specific file-level comments with line numbers and suggested fixes"""
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +503,7 @@ def _extract_json(text: str) -> dict:
         raise
 
 
-async def call_claude(system: str, user: str) -> dict:
+async def call_claude(system: str, user: str) -> tuple[dict, dict]:
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -391,11 +520,17 @@ async def call_claude(system: str, user: str) -> dict:
             },
         )
         resp.raise_for_status()
-        content = resp.json()["content"][0]["text"]
-        return _extract_json(content)
+        data = resp.json()
+        content = data["content"][0]["text"]
+        usage = data.get("usage", {})
+        token_usage = {
+            "input_tokens": usage.get("input_tokens", 0),
+            "output_tokens": usage.get("output_tokens", 0),
+        }
+        return _extract_json(content), token_usage
 
 
-async def call_gemini(system: str, user: str) -> dict:
+async def call_gemini(system: str, user: str) -> tuple[dict, dict]:
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/"
         f"models/{settings.ai_gemini_model}:generateContent"
@@ -411,11 +546,17 @@ async def call_gemini(system: str, user: str) -> dict:
             },
         )
         resp.raise_for_status()
-        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return _extract_json(text)
+        data = resp.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        usage_meta = data.get("usageMetadata", {})
+        token_usage = {
+            "input_tokens": usage_meta.get("promptTokenCount", 0),
+            "output_tokens": usage_meta.get("candidatesTokenCount", 0),
+        }
+        return _extract_json(text), token_usage
 
 
-async def call_ollama(system: str, user: str) -> dict:
+async def call_ollama(system: str, user: str) -> tuple[dict, dict]:
     async with httpx.AsyncClient(timeout=300) as client:
         resp = await client.post(
             f"{settings.ai_ollama_url}/api/chat",
@@ -429,8 +570,13 @@ async def call_ollama(system: str, user: str) -> dict:
             },
         )
         resp.raise_for_status()
-        text = resp.json()["message"]["content"]
-        return _extract_json(text)
+        data = resp.json()
+        text = data["message"]["content"]
+        token_usage = {
+            "input_tokens": data.get("prompt_eval_count", 0),
+            "output_tokens": data.get("eval_count", 0),
+        }
+        return _extract_json(text), token_usage
 
 
 _PROVIDER_MAP = {
@@ -466,8 +612,9 @@ async def review_pr(pr_id: str, provider: str) -> dict:
     t0 = _time.monotonic()
     error_msg = ""
     status = "success"
+    token_usage: dict = {}
     try:
-        result = await _PROVIDER_MAP[provider](system, user)
+        result, token_usage = await _PROVIDER_MAP[provider](system, user)
     except Exception as exc:
         status = "error"
         error_msg = str(exc)
@@ -476,10 +623,12 @@ async def review_pr(pr_id: str, provider: str) -> dict:
         latency = int((_time.monotonic() - t0) * 1000)
         try:
             from agents.telemetry import record_event
-
-            input_chars = len(system) + len(user)
-            est_input_tokens = input_chars // 4
-            est_output_tokens = 500
+            input_tokens = token_usage.get("input_tokens", 0)
+            output_tokens = token_usage.get("output_tokens", 0)
+            if not input_tokens:
+                input_tokens = (len(system) + len(user)) // 4
+            if not output_tokens:
+                output_tokens = 500
             model = ""
             if provider == "claude":
                 model = settings.ai_claude_model
@@ -488,16 +637,11 @@ async def review_pr(pr_id: str, provider: str) -> dict:
             elif provider == "ollama":
                 model = settings.ai_ollama_model
             record_event(
-                "ai-review",
-                "review_pr",
-                provider=provider,
-                model=model,
-                input_tokens=est_input_tokens,
-                output_tokens=est_output_tokens,
-                latency_ms=latency,
-                status=status,
-                error=error_msg,
-                metadata={"pr_id": pr_id},
+                "ai-review", "review_pr",
+                provider=provider, model=model,
+                input_tokens=input_tokens, output_tokens=output_tokens,
+                latency_ms=latency, status=status, error=error_msg,
+                metadata={"pr_id": pr_id, "tokens_estimated": not bool(token_usage)},
             )
         except Exception:
             logger.debug("Telemetry recording failed", exc_info=True)
