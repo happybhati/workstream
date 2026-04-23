@@ -193,6 +193,29 @@ CREATE TABLE IF NOT EXISTS readiness_scans (
 );
 
 CREATE INDEX IF NOT EXISTS idx_readiness_repo ON readiness_scans(owner, repo);
+
+-- AI Telemetry: cost and usage tracking
+CREATE TABLE IF NOT EXISTS ai_telemetry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_name TEXT NOT NULL DEFAULT '',
+    operation TEXT NOT NULL DEFAULT '',
+    provider TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    cost_usd REAL DEFAULT 0.0,
+    latency_ms INTEGER DEFAULT 0,
+    feature TEXT DEFAULT '',
+    status TEXT DEFAULT 'success',
+    error TEXT DEFAULT '',
+    metadata TEXT DEFAULT '',
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_created ON ai_telemetry(created_at);
+CREATE INDEX IF NOT EXISTS idx_telemetry_agent ON ai_telemetry(agent_name);
+CREATE INDEX IF NOT EXISTS idx_telemetry_model ON ai_telemetry(model);
 """
 
 
@@ -713,5 +736,108 @@ async def delete_readiness_scans_bulk(scan_ids: list[int]) -> int:
         cursor = await db.execute(f"DELETE FROM readiness_scans WHERE id IN ({placeholders})", scan_ids)
         await db.commit()
         return cursor.rowcount
+    finally:
+        await db.close()
+
+
+# ---------------------------------------------------------------------------
+# AI Telemetry
+# ---------------------------------------------------------------------------
+
+
+async def insert_telemetry_event(event: dict) -> int:
+    """Insert a single AI telemetry event and return the new row id."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """INSERT INTO ai_telemetry
+               (agent_name, operation, provider, model,
+                input_tokens, output_tokens, total_tokens,
+                cost_usd, latency_ms, feature, status, error,
+                metadata, created_at)
+               VALUES (:agent_name, :operation, :provider, :model,
+                       :input_tokens, :output_tokens, :total_tokens,
+                       :cost_usd, :latency_ms, :feature, :status, :error,
+                       :metadata, :created_at)""",
+            event,
+        )
+        await db.commit()
+        return cursor.lastrowid
+    finally:
+        await db.close()
+
+
+async def get_ai_cost_summary(period: str = "30d") -> dict:
+    """Aggregate AI telemetry into a summary suitable for the costs dashboard."""
+    from datetime import datetime, timedelta, timezone
+
+    db = await get_db()
+    try:
+        if period == "all":
+            since = "1970-01-01T00:00:00+00:00"
+        else:
+            days = int(period.replace("d", ""))
+            since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+        # Totals
+        row = await db.execute_fetchall(
+            """SELECT COUNT(*) AS total_calls,
+                      COALESCE(SUM(input_tokens), 0) AS total_input_tokens,
+                      COALESCE(SUM(output_tokens), 0) AS total_output_tokens,
+                      COALESCE(SUM(cost_usd), 0) AS total_cost,
+                      COALESCE(AVG(latency_ms), 0) AS avg_latency_ms
+               FROM ai_telemetry WHERE created_at >= ?""",
+            (since,),
+        )
+        totals = dict(row[0]) if row else {}
+
+        # By model
+        by_model = [
+            dict(r)
+            for r in await db.execute_fetchall(
+                """SELECT model, provider,
+                          COUNT(*) AS calls,
+                          SUM(input_tokens) AS input_tokens,
+                          SUM(output_tokens) AS output_tokens,
+                          SUM(cost_usd) AS cost_usd,
+                          AVG(latency_ms) AS avg_latency_ms
+                   FROM ai_telemetry WHERE created_at >= ?
+                   GROUP BY model ORDER BY cost_usd DESC""",
+                (since,),
+            )
+        ]
+
+        # By feature
+        by_feature = [
+            dict(r)
+            for r in await db.execute_fetchall(
+                """SELECT feature,
+                          COUNT(*) AS calls,
+                          SUM(cost_usd) AS cost_usd
+                   FROM ai_telemetry WHERE created_at >= ?
+                   GROUP BY feature ORDER BY cost_usd DESC""",
+                (since,),
+            )
+        ]
+
+        # Daily trend
+        daily = [
+            dict(r)
+            for r in await db.execute_fetchall(
+                """SELECT DATE(created_at) AS date,
+                          SUM(cost_usd) AS cost_usd,
+                          COUNT(*) AS calls
+                   FROM ai_telemetry WHERE created_at >= ?
+                   GROUP BY DATE(created_at) ORDER BY date""",
+                (since,),
+            )
+        ]
+
+        return {
+            "totals": totals,
+            "by_model": by_model,
+            "by_feature": by_feature,
+            "daily": daily,
+        }
     finally:
         await db.close()

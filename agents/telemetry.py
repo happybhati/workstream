@@ -26,8 +26,7 @@ def _init_telemetry_schema() -> None:
     db.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db)
     try:
-        conn.execute(
-            """
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS agent_telemetry (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 agent_name TEXT NOT NULL,
@@ -44,37 +43,24 @@ def _init_telemetry_schema() -> None:
                 metadata TEXT DEFAULT '{}',
                 created_at TEXT NOT NULL
             )
-        """
-        )
-        conn.execute(
-            """
+        """)
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_telemetry_agent_time
             ON agent_telemetry (agent_name, created_at DESC)
-        """
-        )
-        conn.execute(
-            """
+        """)
+        conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_telemetry_time
             ON agent_telemetry (created_at DESC)
-        """
-        )
+        """)
         conn.commit()
     finally:
         conn.close()
 
 
-COST_PER_MILLION_TOKENS: dict[str, dict[str, float]] = {
-    "claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
-    "claude-3-5-sonnet": {"input": 3.0, "output": 15.0},
-    "gemini-2.0-flash": {"input": 0.075, "output": 0.30},
-    "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
-    "llama3": {"input": 0.0, "output": 0.0},
-}
-
-
 def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    rates = COST_PER_MILLION_TOKENS.get(model, {"input": 0.0, "output": 0.0})
-    return (input_tokens * rates["input"] + output_tokens * rates["output"]) / 1_000_000
+    from model_registry import estimate_cost as _registry_cost
+
+    return _registry_cost(model, input_tokens, output_tokens)
 
 
 def record_event(
@@ -89,12 +75,22 @@ def record_event(
     status: str = "success",
     error: str = "",
     metadata: dict | None = None,
+    feature: str = "",
 ) -> None:
-    """Record a telemetry event (sync, safe to call from anywhere)."""
+    """Record a telemetry event (sync, safe to call from anywhere).
+
+    Writes to both the legacy agent_telemetry DB and the unified
+    ai_telemetry table in the main database for backward compatibility.
+    """
     _init_telemetry_schema()
     total = input_tokens + output_tokens
     cost = estimate_cost(model, input_tokens, output_tokens)
     now = datetime.now(timezone.utc).isoformat()
+    meta_json = json.dumps(metadata or {})
+
+    if not feature:
+        feature = agent_name
+
     try:
         conn = sqlite3.connect(_get_db_path())
         try:
@@ -115,7 +111,7 @@ def record_event(
                     latency_ms,
                     status,
                     error,
-                    json.dumps(metadata or {}),
+                    meta_json,
                     now,
                 ),
             )
@@ -123,7 +119,60 @@ def record_event(
         finally:
             conn.close()
     except Exception:
-        logger.exception("Failed to record telemetry event")
+        logger.exception("Failed to record telemetry event (legacy)")
+
+    try:
+        from config import settings as _settings
+
+        main_conn = sqlite3.connect(str(_settings.db_path))
+        try:
+            main_conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_telemetry (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    agent_name TEXT NOT NULL,
+                    operation TEXT NOT NULL,
+                    provider TEXT DEFAULT '',
+                    model TEXT DEFAULT '',
+                    input_tokens INTEGER DEFAULT 0,
+                    output_tokens INTEGER DEFAULT 0,
+                    total_tokens INTEGER DEFAULT 0,
+                    cost_usd REAL DEFAULT 0.0,
+                    latency_ms INTEGER DEFAULT 0,
+                    feature TEXT DEFAULT '',
+                    status TEXT DEFAULT 'success',
+                    error TEXT DEFAULT '',
+                    metadata TEXT DEFAULT '{}',
+                    created_at TEXT NOT NULL
+                )
+            """)
+            main_conn.execute(
+                """INSERT INTO ai_telemetry
+                   (agent_name, operation, provider, model, input_tokens,
+                    output_tokens, total_tokens, cost_usd, latency_ms,
+                    feature, status, error, metadata, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    agent_name,
+                    operation,
+                    provider,
+                    model,
+                    input_tokens,
+                    output_tokens,
+                    total,
+                    cost,
+                    latency_ms,
+                    feature,
+                    status,
+                    error,
+                    meta_json,
+                    now,
+                ),
+            )
+            main_conn.commit()
+        finally:
+            main_conn.close()
+    except Exception:
+        logger.debug("Failed to write to unified ai_telemetry table", exc_info=True)
 
 
 def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
@@ -133,8 +182,7 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
     conn.row_factory = sqlite3.Row
     try:
         cutoff = datetime.now(timezone.utc).isoformat()[:10]
-        cur = conn.execute(
-            """
+        cur = conn.execute("""
             SELECT
                 agent_name,
                 COUNT(*) as total_ops,
@@ -146,8 +194,7 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             FROM agent_telemetry
             GROUP BY agent_name
             ORDER BY total_ops DESC
-        """
-        )
+        """)
         by_agent = {}
         for row in cur.fetchall():
             by_agent[row["agent_name"]] = {
@@ -159,27 +206,22 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
                 "error_count": row["error_count"],
             }
 
-        cur = conn.execute(
-            """
+        cur = conn.execute("""
             SELECT
                 COUNT(*) as total_events,
                 SUM(total_tokens) as all_tokens,
                 SUM(cost_usd) as all_cost,
                 AVG(latency_ms) as avg_latency
             FROM agent_telemetry
-        """
-        )
+        """)
         totals_row = cur.fetchone()
 
-        cur = conn.execute(
-            """
+        cur = conn.execute("""
             SELECT * FROM agent_telemetry ORDER BY id DESC LIMIT 20
-        """
-        )
+        """)
         recent = [dict(r) for r in cur.fetchall()]
 
-        cur = conn.execute(
-            """
+        cur = conn.execute("""
             SELECT
                 date(created_at) as day,
                 COUNT(*) as ops,
@@ -189,8 +231,7 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             GROUP BY date(created_at)
             ORDER BY day DESC
             LIMIT 30
-        """
-        )
+        """)
         daily = [dict(r) for r in cur.fetchall()]
 
         return {
@@ -198,8 +239,8 @@ def get_telemetry_summary(days: int = 30) -> dict[str, Any]:
             "totals": {
                 "total_events": totals_row["total_events"] if totals_row else 0,
                 "total_tokens": totals_row["all_tokens"] or 0 if totals_row else 0,
-                "total_cost": (round(totals_row["all_cost"] or 0, 6) if totals_row else 0),
-                "avg_latency_ms": (round(totals_row["avg_latency"] or 0) if totals_row else 0),
+                "total_cost": round(totals_row["all_cost"] or 0, 6) if totals_row else 0,
+                "avg_latency_ms": round(totals_row["avg_latency"] or 0) if totals_row else 0,
             },
             "recent_events": recent,
             "daily_stats": daily,

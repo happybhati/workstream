@@ -213,31 +213,37 @@ async def scan_repo(repo_url: str) -> dict:
     has_dependabot = bool(key_files.get(".github/dependabot.yml", ""))
     has_renovate = bool(renovate_files)
 
-    e2e_dirs = sorted({
-        p.split("/")[0] for p in all_paths
-        if p.split("/")[0].lower() in ("e2e", "integration-tests", "integration")
-        and "/" in p
-    } | {
-        "/".join(p.split("/")[:2]) for p in all_paths
-        if len(p.split("/")) >= 3 and p.split("/")[1].lower() in ("e2e", "integration")
-    })
+    e2e_dirs = sorted(
+        {
+            p.split("/")[0]
+            for p in all_paths
+            if p.split("/")[0].lower() in ("e2e", "integration-tests", "integration") and "/" in p
+        }
+        | {
+            "/".join(p.split("/")[:2])
+            for p in all_paths
+            if len(p.split("/")) >= 3 and p.split("/")[1].lower() in ("e2e", "integration")
+        }
+    )
 
     hack_scripts = sorted(p for p in all_paths if p.startswith("hack/"))
 
     kind_configs = sorted(
-        p for p in all_paths
-        if "kind" in p.lower()
-        and (p.endswith(".yaml") or p.endswith(".yml") or p.endswith(".conf"))
+        p
+        for p in all_paths
+        if "kind" in p.lower() and (p.endswith(".yaml") or p.endswith(".yml") or p.endswith(".conf"))
     )
 
     dockerfiles = sorted(
-        p for p in all_paths
+        p
+        for p in all_paths
         if p.split("/")[-1].lower() in ("dockerfile", "containerfile")
         or p.split("/")[-1].lower().startswith("dockerfile.")
     )
 
     deployment_manifests = sorted(
-        p for p in all_paths
+        p
+        for p in all_paths
         if any(seg in p.lower() for seg in ("deploy", "kustomize", "helm", "manifest", "k8s", "kubernetes"))
         and (p.endswith(".yaml") or p.endswith(".yml") or p.endswith(".json"))
     )
@@ -250,7 +256,9 @@ async def scan_repo(repo_url: str) -> dict:
         headers=_github_headers(),
         timeout=30,
     ) as client:
-        ci_yaml_paths = [p for p in all_paths if p.startswith(".github/workflows/") and (p.endswith(".yml") or p.endswith(".yaml"))]
+        ci_yaml_paths = [
+            p for p in all_paths if p.startswith(".github/workflows/") and (p.endswith(".yml") or p.endswith(".yaml"))
+        ]
         for ci_path in ci_yaml_paths[:5]:
             content = await _fetch_file(client, owner, repo, ci_path)
             if content:
@@ -360,9 +368,13 @@ def _extract_ci_commands(ci_content: dict[str, str]) -> dict[str, list[str]]:
 
     run_re = re.compile(r"^\s*-?\s*run:\s*[|>]?\s*(.+)$", re.MULTILINE)
     test_kw = re.compile(r"(?i)(pytest|go\s+test|npm\s+test|cargo\s+test|make\s+test|yarn\s+test|mvn\s+test|tox)")
-    build_kw = re.compile(r"(?i)(go\s+build|npm\s+run\s+build|cargo\s+build|make\s+build|mvn\s+package|gradle\s+build|docker\s+build)")
+    build_kw = re.compile(
+        r"(?i)(go\s+build|npm\s+run\s+build|cargo\s+build|make\s+build|mvn\s+package|gradle\s+build|docker\s+build)"
+    )
     lint_kw = re.compile(r"(?i)(lint|golangci|eslint|ruff|flake8|pylint|clippy|prettier|black|isort|mypy)")
-    install_kw = re.compile(r"(?i)(pip\s+install|npm\s+(ci|install)|go\s+mod|cargo\s+fetch|yarn\s+install|poetry\s+install)")
+    install_kw = re.compile(
+        r"(?i)(pip\s+install|npm\s+(ci|install)|go\s+mod|cargo\s+fetch|yarn\s+install|poetry\s+install)"
+    )
 
     for _path, content in ci_content.items():
         for m in run_re.finditer(content):
