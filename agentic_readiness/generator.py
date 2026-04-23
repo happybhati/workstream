@@ -15,6 +15,14 @@ Produces tool-specific files:
   - ARCHITECTURE.md   (structural overview)
   - CONTRIBUTING.md   (workflow guide)
 
+Agent Skills (agentskills.io-compatible):
+  - skills/running-tests/SKILL.md
+  - skills/running-e2e-tests/SKILL.md
+  - skills/definition-of-done/SKILL.md
+  - skills/debugging-guide/SKILL.md
+  - skills/local-dev-setup/SKILL.md
+  - .claude/README.md (symlink instructions)
+
 Also handles creating draft PRs via the GitHub API.
 """
 
@@ -242,6 +250,7 @@ def generate_claude_md(scan: dict, intelligence: dict | None = None) -> str:
     owner = scan["owner"]
     repo = scan["repo"]
     cmds = _infer_commands(scan)
+    ci_cmds = scan.get("ci_commands", {})
     lang = (scan.get("primary_language") or "").lower()
 
     lines = [
@@ -249,7 +258,11 @@ def generate_claude_md(scan: dict, intelligence: dict | None = None) -> str:
         "",
     ]
 
-    all_cmds = cmds["install"] + cmds["build"] + cmds["test"] + cmds["lint"]
+    install = ci_cmds.get("install", []) or cmds["install"]
+    build = ci_cmds.get("build", []) or cmds["build"]
+    test = ci_cmds.get("test", []) or cmds["test"]
+    lint = ci_cmds.get("lint", []) or cmds["lint"]
+    all_cmds = install[:2] + build[:1] + test[:2] + lint[:2]
     if all_cmds:
         for cmd in all_cmds:
             lines.append(cmd)
@@ -654,6 +667,646 @@ def generate_contributing_md(scan: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Agent Skills (agentskills.io specification)
+# ---------------------------------------------------------------------------
+
+def generate_skill_running_tests(scan: dict) -> str:
+    """Generate skills/running-tests/SKILL.md."""
+    repo = scan["repo"]
+    lang = (scan.get("primary_language") or "").lower()
+    cmds = _infer_commands(scan)
+    ci_cmds = scan.get("ci_commands", {})
+    test_dirs = scan.get("test_dirs", [])
+    makefile_targets = scan.get("makefile_targets", [])
+
+    lines = [
+        "---",
+        "name: running-tests",
+        "description: Use when writing, modifying, or verifying tests. Use when a PR needs test validation, CI is failing, or you need to run a specific test file or function.",
+        "---",
+        "",
+        "# Running Tests",
+        "",
+        "## Quick Start",
+        "",
+    ]
+
+    real_test_cmds = ci_cmds.get("test", []) or cmds["test"]
+    if real_test_cmds:
+        for cmd in real_test_cmds[:3]:
+            lines += ["```bash", cmd, "```", ""]
+    else:
+        lines += ["No standard test command detected. Check the project README or Makefile.", ""]
+
+    test_make_targets = [t for t in makefile_targets if "test" in t.lower()]
+    if test_make_targets:
+        lines += ["## Makefile Targets", ""]
+        for t in test_make_targets[:5]:
+            lines += [f"- `make {t}`"]
+        lines += [""]
+
+    if "go" in lang:
+        lines += [
+            "## Running Specific Tests",
+            "",
+            "```bash",
+            "go test ./path/to/package/...",
+            "go test -v -run TestFunctionName ./...",
+            "go test -race ./...  # recommended for CI",
+            "```",
+            "",
+        ]
+    elif "python" in lang:
+        lines += [
+            "## Running Specific Tests",
+            "",
+            "```bash",
+            "pytest path/to/test_file.py",
+            "pytest path/to/test_file.py::test_function_name",
+            "pytest -v --tb=short  # verbose with short tracebacks",
+            "```",
+            "",
+        ]
+    elif "typescript" in lang or "javascript" in lang:
+        lines += [
+            "## Running Specific Tests",
+            "",
+            "```bash",
+            "npm test -- --testPathPattern=path/to/test",
+            "```",
+            "",
+        ]
+
+    if test_dirs:
+        lines += ["## Test Locations", ""]
+        for d in test_dirs[:10]:
+            lines += [f"- `{d}/`"]
+        lines += [""]
+
+    real_lint_cmds = ci_cmds.get("lint", []) or cmds["lint"]
+    if real_lint_cmds:
+        lines += ["## Linting (run before committing)", ""]
+        for cmd in real_lint_cmds[:3]:
+            lines += ["```bash", cmd, "```", ""]
+
+    lines += [
+        "## Output Format",
+        "",
+        "When reporting test results, use:",
+        "",
+        "```markdown",
+        "## Test Results",
+        "",
+        "**Command:** `<command run>`",
+        "**Status:** PASS / FAIL",
+        "**Failed tests:** <list if any>",
+        "**Root cause:** <brief analysis if failing>",
+        "```",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def generate_skill_running_e2e_tests(scan: dict) -> str:
+    """Generate skills/running-e2e-tests/SKILL.md."""
+    repo = scan["repo"]
+    lang = (scan.get("primary_language") or "").lower()
+    all_paths = scan.get("tree", [])
+    dirs = scan.get("dirs", [])
+
+    e2e_dirs = [d for d in dirs if d.lower() in ("e2e", "integration-tests", "integration", "test/e2e")]
+    e2e_paths = [p for p in all_paths if any(seg in p.lower() for seg in ("e2e", "integration-test", "integration_test"))]
+    has_kind = any("kind" in p.lower() for p in all_paths)
+    has_docker_compose = any("docker-compose" in p.lower() or "compose.yaml" in p.lower() or "compose.yml" in p.lower() for p in all_paths)
+    has_makefile = any(p.split("/")[-1] == "Makefile" for p in all_paths)
+    hack_scripts = [p for p in all_paths if p.startswith("hack/")]
+
+    lines = [
+        "---",
+        "name: running-e2e-tests",
+        "description: Use when verifying cross-component behavior, debugging CI e2e failures, or testing deployment pipelines. Use when integration tests fail or a PR changes multiple services.",
+        "---",
+        "",
+        "# Running E2E / Integration Tests",
+        "",
+    ]
+
+    if e2e_dirs:
+        lines += ["## E2E Test Locations", ""]
+        for d in e2e_dirs:
+            lines += [f"- `{d}/`"]
+        lines += [""]
+
+    if has_kind:
+        lines += [
+            "## Kind Cluster Setup",
+            "",
+            "This repo uses [kind](https://kind.sigs.k8s.io/) for local Kubernetes testing.",
+            "",
+            "```bash",
+            "# Create a kind cluster (check hack/ or Makefile for project-specific config)",
+            "kind create cluster --name test-cluster",
+            "```",
+            "",
+            "Tear down after testing:",
+            "```bash",
+            "kind delete cluster --name test-cluster",
+            "```",
+            "",
+        ]
+
+    if has_docker_compose:
+        lines += [
+            "## Docker Compose",
+            "",
+            "```bash",
+            "docker-compose up -d",
+            "# run tests",
+            "docker-compose down",
+            "```",
+            "",
+        ]
+
+    if has_makefile:
+        lines += [
+            "## Makefile Targets",
+            "",
+            "Check available targets:",
+            "```bash",
+            "make help  # or: grep -E '^[a-zA-Z_-]+:' Makefile",
+            "```",
+            "",
+            "Common e2e-related targets to look for: `make e2e`, `make integration`, `make test-e2e`",
+            "",
+        ]
+
+    if hack_scripts:
+        lines += ["## Hack Scripts", ""]
+        for s in hack_scripts[:10]:
+            lines += [f"- `{s}`"]
+        lines += ["", "Check these scripts for cluster setup, test data seeding, or environment preparation.", ""]
+
+    if "go" in lang:
+        lines += [
+            "## Running Go Integration Tests",
+            "",
+            "```bash",
+            "# Many Go projects use build tags for integration tests",
+            "go test -tags=integration ./...",
+            "```",
+            "",
+        ]
+
+    lines += [
+        "## Tips",
+        "",
+        "- E2E tests may require a running cluster or external services",
+        "- Check CI workflow files for the exact setup steps used in automated runs",
+        "- Clean up test resources after running to avoid state leakage",
+        "",
+        "## Output Format",
+        "",
+        "When reporting e2e results, use:",
+        "",
+        "```markdown",
+        "## E2E Test Results",
+        "",
+        "**Test suite:** <name>",
+        "**Status:** PASS / FAIL",
+        "**Failed tests:** <test names>",
+        "**Category:** A (test code) / B (app code) / C (infra/flaky)",
+        "**Root cause:** <analysis>",
+        "**Suggested fix:** <file and change>",
+        "```",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def generate_skill_definition_of_done(scan: dict, intelligence: dict | None = None) -> str:
+    """Generate skills/definition-of-done/SKILL.md."""
+    repo = scan["repo"]
+    cmds = _infer_commands(scan)
+    ci_workflows = scan.get("ci_workflows", [])
+    linter_files = scan.get("linter_files", [])
+
+    lines = [
+        "---",
+        "name: definition-of-done",
+        "description: Use when preparing a PR for review, checking if a change is complete, or an agent needs to verify its own work before submitting. Use when you need the PR checklist.",
+        "---",
+        "",
+        "# Definition of Done",
+        "",
+        "Before submitting a PR, ensure all items are checked:",
+        "",
+        "## Code Quality",
+        "",
+        "- [ ] Code follows existing patterns and conventions in this repository",
+        "- [ ] No commented-out code or debug statements left behind",
+        "- [ ] Functions and variables have clear, descriptive names",
+        "",
+        "## Testing",
+        "",
+    ]
+
+    if cmds["test"]:
+        lines += [f"- [ ] All tests pass: `{cmds['test'][0]}`"]
+    else:
+        lines += ["- [ ] All existing tests pass"]
+    lines += [
+        "- [ ] New functionality has corresponding test coverage",
+        "- [ ] Edge cases and error paths are tested",
+        "",
+    ]
+
+    if cmds["lint"] or linter_files:
+        lines += ["## Linting", ""]
+        if cmds["lint"]:
+            lines += [f"- [ ] Linter passes: `{cmds['lint'][0]}`"]
+        else:
+            lines += ["- [ ] Code passes all configured linters"]
+        lines += [""]
+
+    if ci_workflows:
+        lines += ["## CI Checks", ""]
+        lines += ["- [ ] All CI workflows pass:"]
+        for w in ci_workflows[:8]:
+            lines += [f"  - {w}"]
+        lines += [""]
+
+    lines += [
+        "## Documentation",
+        "",
+        "- [ ] Public APIs or user-facing changes are documented",
+        "- [ ] README updated if behavior changes",
+        "- [ ] Commit messages are clear and follow project conventions",
+        "",
+        "## PR Hygiene",
+        "",
+        "- [ ] PR is focused on a single concern",
+        "- [ ] PR description explains WHAT changed and WHY",
+        "- [ ] No unrelated changes bundled in",
+        "",
+    ]
+
+    if intelligence and intelligence.get("patterns"):
+        lines += ["## Team Review Patterns", "", "Based on historical review analysis, reviewers commonly flag:", ""]
+        for p in intelligence["patterns"][:5]:
+            lines += [f"- {p['pattern']}"]
+        lines += [""]
+
+    return "\n".join(lines)
+
+
+def generate_skill_debugging_guide(scan: dict) -> str:
+    """Generate skills/debugging-guide/SKILL.md."""
+    repo = scan["repo"]
+    lang = (scan.get("primary_language") or "").lower()
+    all_paths = scan.get("tree", [])
+
+    has_dockerfile = any(p.split("/")[-1].lower() in ("dockerfile", "containerfile") for p in all_paths)
+    has_k8s = any(seg in p.lower() for p in all_paths for seg in ("deploy", "kustomize", "helm", "manifest"))
+    log_files = [p for p in all_paths if "log" in p.lower() and ("config" in p.lower() or "setup" in p.lower())]
+    env_files = [p for p in all_paths if p.split("/")[-1].startswith(".env")]
+
+    lines = [
+        "---",
+        "name: debugging-guide",
+        "description: Use when investigating bugs, unexpected behavior, test failures, or CI errors. Use when logs show errors, tests fail intermittently, or the application crashes.",
+        "---",
+        "",
+        "# Debugging Guide",
+        "",
+        "## General Approach",
+        "",
+        "1. Reproduce the issue with a minimal test case",
+        "2. Check logs for error messages and stack traces",
+        "3. Use a debugger or add targeted logging",
+        "4. Verify the fix with a test before submitting",
+        "",
+    ]
+
+    if "go" in lang:
+        lines += [
+            "## Go Debugging",
+            "",
+            "Use delve for interactive debugging:",
+            "```bash",
+            "dlv test ./path/to/package -- -test.run TestName",
+            "```",
+            "",
+            "Enable verbose logging:",
+            "```bash",
+            "go test -v -count=1 ./...",
+            "```",
+            "",
+            "Profile a slow test:",
+            "```bash",
+            "go test -cpuprofile cpu.prof -memprofile mem.prof ./...",
+            "```",
+            "",
+        ]
+    elif "python" in lang:
+        lines += [
+            "## Python Debugging",
+            "",
+            "Drop into a debugger at a specific point:",
+            "```python",
+            "import pdb; pdb.set_trace()  # or: breakpoint()",
+            "```",
+            "",
+            "Run pytest with output visible:",
+            "```bash",
+            "pytest -s -v path/to/test_file.py",
+            "```",
+            "",
+            "Debug a specific test:",
+            "```bash",
+            "pytest --pdb path/to/test_file.py::test_name",
+            "```",
+            "",
+        ]
+    elif "typescript" in lang or "javascript" in lang:
+        lines += [
+            "## Node.js Debugging",
+            "",
+            "Run with inspector:",
+            "```bash",
+            "node --inspect-brk dist/index.js",
+            "```",
+            "",
+            "Then open `chrome://inspect` in Chrome.",
+            "",
+        ]
+
+    if has_dockerfile:
+        lines += [
+            "## Container Debugging",
+            "",
+            "Build and run locally:",
+            "```bash",
+            "docker build -t debug-image .",
+            "docker run -it --entrypoint /bin/sh debug-image",
+            "```",
+            "",
+            "Check container logs:",
+            "```bash",
+            "docker logs <container-id>",
+            "```",
+            "",
+        ]
+
+    if has_k8s:
+        lines += [
+            "## Kubernetes Debugging",
+            "",
+            "Check pod status and logs:",
+            "```bash",
+            "kubectl get pods -n <namespace>",
+            "kubectl logs -f <pod-name> -n <namespace>",
+            "kubectl describe pod <pod-name> -n <namespace>",
+            "```",
+            "",
+            "Exec into a running pod:",
+            "```bash",
+            "kubectl exec -it <pod-name> -n <namespace> -- /bin/sh",
+            "```",
+            "",
+        ]
+
+    if env_files:
+        lines += ["## Environment Variables", ""]
+        for f in env_files[:5]:
+            lines += [f"- Check `{f}` for configuration settings"]
+        lines += ["", "Missing or incorrect environment variables are a common source of bugs.", ""]
+
+    lines += [
+        "## Common Issues",
+        "",
+        "- **Tests pass locally but fail in CI**: Check for environment differences, missing env vars, or timing-dependent tests",
+        "- **Flaky tests**: Look for shared state, race conditions, or network dependencies",
+        "- **Build failures**: Verify dependency versions match what CI uses",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def generate_skill_local_dev_setup(scan: dict) -> str:
+    """Generate skills/local-dev-setup/SKILL.md."""
+    repo = scan["repo"]
+    owner = scan["owner"]
+    lang = (scan.get("primary_language") or "").lower()
+    cmds = _infer_commands(scan)
+    all_paths = scan.get("tree", [])
+    dep_files = scan.get("dep_files", [])
+
+    has_kind = any("kind" in p.lower() for p in all_paths)
+    has_docker_compose = any("docker-compose" in p.lower() or "compose.yaml" in p.lower() or "compose.yml" in p.lower() for p in all_paths)
+    has_makefile = any(p.split("/")[-1] == "Makefile" for p in all_paths)
+    hack_scripts = [p for p in all_paths if p.startswith("hack/")]
+    has_dockerfile = any(p.split("/")[-1].lower() in ("dockerfile", "containerfile") for p in all_paths)
+
+    lines = [
+        "---",
+        "name: local-dev-setup",
+        "description: Use when onboarding to this repo, cloning for the first time, resetting a dev environment, or an agent needs to set up a working local instance.",
+        "---",
+        "",
+        "# Local Development Setup",
+        "",
+        "## Prerequisites",
+        "",
+    ]
+
+    prereqs = []
+    if "go" in lang:
+        prereqs += ["- [Go](https://go.dev/dl/) (check `go.mod` for minimum version)"]
+    if "python" in lang:
+        prereqs += ["- [Python 3](https://www.python.org/downloads/) (check `pyproject.toml` or `setup.cfg` for minimum version)"]
+    if "typescript" in lang or "javascript" in lang:
+        prereqs += ["- [Node.js](https://nodejs.org/) (check `package.json` engines field)"]
+    if "rust" in lang:
+        prereqs += ["- [Rust](https://rustup.rs/)"]
+    if has_kind:
+        prereqs += ["- [kind](https://kind.sigs.k8s.io/) (for local Kubernetes cluster)"]
+    if has_docker_compose or has_dockerfile:
+        prereqs += ["- [Docker](https://docs.docker.com/get-docker/)"]
+    prereqs += ["- [Git](https://git-scm.com/)"]
+
+    lines += prereqs + [""]
+
+    lines += [
+        "## Clone & Setup",
+        "",
+        "```bash",
+        f"git clone https://github.com/{owner}/{repo}.git",
+        f"cd {repo}",
+        "```",
+        "",
+    ]
+
+    if cmds["install"]:
+        lines += ["## Install Dependencies", ""]
+        for cmd in cmds["install"]:
+            lines += ["```bash", cmd, "```", ""]
+
+    if cmds["build"]:
+        lines += ["## Build", ""]
+        for cmd in cmds["build"]:
+            lines += ["```bash", cmd, "```", ""]
+
+    if cmds["test"]:
+        lines += ["## Verify Setup", "", "Run the test suite to confirm everything works:", ""]
+        for cmd in cmds["test"]:
+            lines += ["```bash", cmd, "```", ""]
+
+    if has_kind:
+        lines += [
+            "## Kind Cluster Setup",
+            "",
+            "```bash",
+            "# Create a local Kubernetes cluster",
+            "kind create cluster --name dev-cluster",
+            "",
+            "# Verify it's running",
+            "kubectl cluster-info --context kind-dev-cluster",
+            "```",
+            "",
+            "To tear down:",
+            "```bash",
+            "kind delete cluster --name dev-cluster",
+            "```",
+            "",
+        ]
+
+    if has_docker_compose:
+        lines += [
+            "## Docker Compose Services",
+            "",
+            "```bash",
+            "docker-compose up -d",
+            "```",
+            "",
+        ]
+
+    if has_makefile:
+        lines += [
+            "## Makefile",
+            "",
+            "This project has a Makefile. List available targets:",
+            "```bash",
+            "make help",
+            "```",
+            "",
+        ]
+
+    if hack_scripts:
+        lines += ["## Developer Scripts", "", "Useful scripts in `hack/`:", ""]
+        for s in hack_scripts[:8]:
+            lines += [f"- `{s}`"]
+        lines += [""]
+
+    lines += [
+        "## IDE Setup",
+        "",
+        "If using Cursor or VS Code, the repo may include:",
+        "- `.cursor/rules/` -- AI coding rules",
+        "- `.vscode/` -- editor settings",
+        "- `.editorconfig` -- formatting rules",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def generate_bookmarks_md(scan: dict) -> str:
+    """Generate BOOKMARKS.md for progressive disclosure (fullsend best practice)."""
+    repo = scan["repo"]
+    owner = scan["owner"]
+
+    lines = [
+        f"# Bookmarks for {owner}/{repo}",
+        "",
+        "Curated references for agents to load on demand. Each entry describes",
+        "what the target contains so agents can decide whether to load it.",
+        "",
+    ]
+
+    if scan.get("ci_workflows"):
+        lines += [
+            "## CI/CD",
+            "",
+        ]
+        for w in scan.get("ci_workflows", [])[:5]:
+            lines += [f"- `.github/workflows/` — {w}: build, test, and deploy pipeline"]
+        lines += [""]
+
+    if scan.get("doc_dirs"):
+        lines += ["## Documentation", ""]
+        for d in scan.get("doc_dirs", []):
+            lines += [f"- `{d}/` — project documentation and guides"]
+        lines += [""]
+
+    if scan["key_files"].get("CONTRIBUTING.md"):
+        lines += ["- `CONTRIBUTING.md` — how to submit changes, coding standards, PR process", ""]
+
+    if scan["key_files"].get("ARCHITECTURE.md"):
+        lines += ["- `ARCHITECTURE.md` — system design, component boundaries, key decisions", ""]
+
+    existing_skills = scan.get("existing_skills", [])
+    if existing_skills:
+        lines += ["## Agent Skills", ""]
+        for skill_path in existing_skills:
+            skill_name = skill_path.split("/")[1] if len(skill_path.split("/")) >= 3 else skill_path
+            lines += [f"- `{skill_path}` — {skill_name} skill"]
+        lines += [""]
+
+    dep_files = scan.get("dep_files", [])
+    if dep_files:
+        lines += ["## Dependencies", ""]
+        for df in dep_files[:5]:
+            lines += [f"- `{df}` — dependency manifest"]
+        lines += [""]
+
+    return "\n".join(lines)
+
+
+def generate_claude_skills_readme(scan: dict) -> str:
+    """Generate .claude/README.md with symlink instructions for skills discovery."""
+    repo = scan["repo"]
+    return dedent(f"""\
+        # Claude Configuration for {repo}
+
+        ## Agent Skills
+
+        This repository uses [Agent Skills](https://agentskills.io/) stored in the
+        `skills/` directory at the repo root.
+
+        To let Claude (and other skills-compatible agents) discover them, create a
+        symlink:
+
+        ```bash
+        ln -sf ../skills .claude/skills
+        ```
+
+        After this, Claude Code and other agents will automatically load the skills
+        when working in this repository.
+
+        ## Available Skills
+
+        - **running-tests** -- How to run the test suite
+        - **running-e2e-tests** -- How to run e2e/integration tests
+        - **definition-of-done** -- PR checklist and review standards
+        - **debugging-guide** -- How to debug issues
+        - **local-dev-setup** -- Setting up a local dev environment
+    """)
+
+
+# ---------------------------------------------------------------------------
 # Generate files -- GAP-FILLING logic
 # ---------------------------------------------------------------------------
 
@@ -690,6 +1343,31 @@ def generate_files(scan: dict, score_result: dict | None = None, intelligence: d
 
     if not key.get("CONTRIBUTING.md"):
         files["CONTRIBUTING.md"] = generate_contributing_md(scan)
+
+    existing_skills = [p for p in scan.get("tree", []) if p.startswith("skills/") and p.endswith("SKILL.md")]
+    existing_skill_names = {p.split("/")[1] for p in existing_skills if len(p.split("/")) >= 3}
+
+    if "running-tests" not in existing_skill_names:
+        files["skills/running-tests/SKILL.md"] = generate_skill_running_tests(scan)
+
+    if "running-e2e-tests" not in existing_skill_names:
+        files["skills/running-e2e-tests/SKILL.md"] = generate_skill_running_e2e_tests(scan)
+
+    if "definition-of-done" not in existing_skill_names:
+        files["skills/definition-of-done/SKILL.md"] = generate_skill_definition_of_done(scan, intelligence)
+
+    if "debugging-guide" not in existing_skill_names:
+        files["skills/debugging-guide/SKILL.md"] = generate_skill_debugging_guide(scan)
+
+    if "local-dev-setup" not in existing_skill_names:
+        files["skills/local-dev-setup/SKILL.md"] = generate_skill_local_dev_setup(scan)
+
+    has_claude_readme = any(p.lower() == ".claude/readme.md" for p in scan.get("tree", []))
+    if not has_claude_readme:
+        files[".claude/README.md"] = generate_claude_skills_readme(scan)
+
+    if not key.get("BOOKMARKS.md"):
+        files["BOOKMARKS.md"] = generate_bookmarks_md(scan)
 
     return files
 
@@ -763,8 +1441,24 @@ async def create_draft_pr(
                 logger.warning("Failed to create %s: %s", filepath, resp.status_code)
 
         file_list = ", ".join(f"`{f}`" for f in files.keys())
-        pr_body = dedent(
-            f"""\
+        skill_files = [f for f in files if f.startswith("skills/")]
+        symlink_note = ""
+        if skill_files:
+            symlink_note = dedent("""\
+
+                ### Agent Skills Setup
+
+                This PR includes [agentskills.io](https://agentskills.io/)-compatible
+                skills in `skills/`. To let Claude Code (or other agents) discover them,
+                create a symlink after merging:
+
+                ```bash
+                mkdir -p .claude && ln -sf ../skills .claude/skills
+                ```
+
+                See `.claude/README.md` for details.
+            """)
+        pr_body = dedent(f"""\
             ## AI Readiness Bootstrap
 
             This PR adds foundational files to make this repository more accessible
@@ -780,7 +1474,7 @@ async def create_draft_pr(
 
             Generated files follow the gap-filling principle: only information
             not already present in existing documentation is included.
-
+            {symlink_note}
             ---
             *Generated by [Workstream AI Readiness Analyzer](http://localhost:8080)*
         """
