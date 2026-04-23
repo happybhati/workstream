@@ -338,6 +338,7 @@ def _score_security(scan: dict) -> dict:
 # Fullsend Readiness (30 pts) -- skills, backpressure, context quality
 # ---------------------------------------------------------------------------
 
+
 def _score_fullsend_readiness(scan: dict) -> dict:
     """Score readiness for fullsend agentic SDLC platform.
 
@@ -355,7 +356,13 @@ def _score_fullsend_readiness(scan: dict) -> dict:
         findings.append(_finding(True, f"Agent Skills directory ({len(existing_skills)} skills)", 8))
         score += 8
     elif existing_skills:
-        findings.append(_finding(True, f"Agent Skills directory ({len(existing_skills)} skill{'s' if len(existing_skills) != 1 else ''})", 4))
+        findings.append(
+            _finding(
+                True,
+                f"Agent Skills directory ({len(existing_skills)} skill{'s' if len(existing_skills) != 1 else ''})",
+                4,
+            )
+        )
         score += 4
     else:
         findings.append(_finding(False, "No skills/ directory with SKILL.md files", 0))
@@ -551,24 +558,30 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
 
     fullsend = categories["fullsend_readiness"]
     if not scan.get("existing_skills"):
-        recs.append({
-            "priority": "high",
-            "text": "Add agent skills in skills/ directory (agentskills.io spec) — running-tests, debugging-guide, definition-of-done are high-value starting points",
-            "impact": "+6 pts",
-        })
+        recs.append(
+            {
+                "priority": "high",
+                "text": "Add agent skills in skills/ directory (agentskills.io spec) — running-tests, debugging-guide, definition-of-done are high-value starting points",
+                "impact": "+6 pts",
+            }
+        )
     if not scan.get("has_bookmarks"):
-        recs.append({
-            "priority": "medium",
-            "text": "Add BOOKMARKS.md for progressive disclosure — curated references agents load on demand",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add BOOKMARKS.md for progressive disclosure — curated references agents load on demand",
+                "impact": "+3 pts",
+            }
+        )
     claude_md_lines = scan.get("claude_md_lines", 0)
     if claude_md_lines > 60:
-        recs.append({
-            "priority": "medium",
-            "text": f"Trim CLAUDE.md to ≤60 lines (currently {claude_md_lines}) — verbose context hurts agent performance (ETH Zürich research)",
-            "impact": "+3 pts",
-        })
+        recs.append(
+            {
+                "priority": "medium",
+                "text": f"Trim CLAUDE.md to ≤60 lines (currently {claude_md_lines}) — verbose context hurts agent performance (ETH Zürich research)",
+                "impact": "+3 pts",
+            }
+        )
 
     priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     recs.sort(key=lambda r: priority_order.get(r["priority"], 4))

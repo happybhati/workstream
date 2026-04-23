@@ -143,12 +143,14 @@ async def _fetch_github_diff(repo: str, number: int) -> tuple[str, dict]:
         changed_files_list = []
         if files_resp.status_code == 200:
             for f in files_resp.json():
-                changed_files_list.append({
-                    "filename": f.get("filename", ""),
-                    "status": f.get("status", ""),
-                    "additions": f.get("additions", 0),
-                    "deletions": f.get("deletions", 0),
-                })
+                changed_files_list.append(
+                    {
+                        "filename": f.get("filename", ""),
+                        "status": f.get("status", ""),
+                        "additions": f.get("additions", 0),
+                        "deletions": f.get("deletions", 0),
+                    }
+                )
 
     labels = [l.get("name", "") for l in pr_data.get("labels", [])]
     reviewers = [r.get("login", "") for r in pr_data.get("requested_reviewers", [])]
@@ -216,12 +218,16 @@ async def _fetch_gitlab_diff(repo: str, number: int) -> tuple[str, dict]:
 
     changed_files_list = []
     for d in diffs_list:
-        changed_files_list.append({
-            "filename": d.get("new_path", d.get("old_path", "")),
-            "status": "renamed" if d.get("renamed_file") else ("added" if d.get("new_file") else ("removed" if d.get("deleted_file") else "modified")),
-            "additions": 0,
-            "deletions": 0,
-        })
+        changed_files_list.append(
+            {
+                "filename": d.get("new_path", d.get("old_path", "")),
+                "status": "renamed"
+                if d.get("renamed_file")
+                else ("added" if d.get("new_file") else ("removed" if d.get("deleted_file") else "modified")),
+                "additions": 0,
+                "deletions": 0,
+            }
+        )
 
     metadata = {
         "title": mr_data.get("title", ""),
@@ -405,7 +411,9 @@ def _build_pr_context(metadata: dict, pr_id: str = "") -> str:
     )
 
     if metadata.get("created_at"):
-        lines.append(f"**Created:** {metadata['created_at'][:10]}  |  **Updated:** {metadata.get('updated_at', '')[:10]}")
+        lines.append(
+            f"**Created:** {metadata['created_at'][:10]}  |  **Updated:** {metadata.get('updated_at', '')[:10]}"
+        )
 
     lines.append("")
 
@@ -623,6 +631,7 @@ async def review_pr(pr_id: str, provider: str) -> dict:
         latency = int((_time.monotonic() - t0) * 1000)
         try:
             from agents.telemetry import record_event
+
             input_tokens = token_usage.get("input_tokens", 0)
             output_tokens = token_usage.get("output_tokens", 0)
             if not input_tokens:
@@ -637,10 +646,15 @@ async def review_pr(pr_id: str, provider: str) -> dict:
             elif provider == "ollama":
                 model = settings.ai_ollama_model
             record_event(
-                "ai-review", "review_pr",
-                provider=provider, model=model,
-                input_tokens=input_tokens, output_tokens=output_tokens,
-                latency_ms=latency, status=status, error=error_msg,
+                "ai-review",
+                "review_pr",
+                provider=provider,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                latency_ms=latency,
+                status=status,
+                error=error_msg,
                 metadata={"pr_id": pr_id, "tokens_estimated": not bool(token_usage)},
             )
         except Exception:
