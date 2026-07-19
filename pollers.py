@@ -1118,6 +1118,152 @@ async def poll_google_calendar() -> None:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Service dependency status (GitHub, Atlassian, GitLab)
+# ---------------------------------------------------------------------------
+
+_service_status: dict = {"services": [], "polled_at": ""}
+
+_GITHUB_COMPONENTS = {"Pull Requests", "Actions", "API Requests", "Issues", "Git Operations"}
+_ATLASSIAN_COMPONENTS = {"Jira", "Jira Service Management"}
+
+STATUS_URLS = {
+    "github": "https://www.githubstatus.com",
+    "atlassian": "https://status.atlassian.com",
+    "gitlab": "https://status.gitlab.com",
+}
+
+
+def get_service_status() -> dict:
+    return _service_status
+
+
+def _worst_status(statuses: list[str]) -> str:
+    order = {"major_outage": 0, "partial_outage": 1, "degraded_performance": 2, "operational": 3}
+    if not statuses:
+        return "operational"
+    return min(statuses, key=lambda s: order.get(s, 99))
+
+
+async def poll_service_status() -> None:
+    global _service_status
+    services = []
+    now = datetime.now(timezone.utc).isoformat()
+
+    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+        # --- GitHub ---
+        try:
+            resp = await client.get("https://www.githubstatus.com/api/v2/summary.json")
+            data = resp.json()
+            components = [
+                {"name": c["name"], "status": c["status"]}
+                for c in data.get("components", [])
+                if c["name"] in _GITHUB_COMPONENTS
+            ]
+            incidents = [
+                {
+                    "name": inc["name"],
+                    "impact": inc.get("impact", ""),
+                    "shortlink": inc.get("shortlink", ""),
+                }
+                for inc in data.get("incidents", [])
+            ]
+            overall = _worst_status([c["status"] for c in components])
+            services.append(
+                {
+                    "name": "GitHub",
+                    "status": overall,
+                    "url": STATUS_URLS["github"],
+                    "components": components,
+                    "incidents": incidents,
+                }
+            )
+        except Exception:
+            logger.warning("Service status: GitHub check failed")
+            services.append(
+                {"name": "GitHub", "status": "unknown", "url": STATUS_URLS["github"], "components": [], "incidents": []}
+            )
+
+        # --- Atlassian (Jira) ---
+        try:
+            resp = await client.get("https://status.atlassian.com/api/v2/summary.json")
+            data = resp.json()
+            components = [
+                {"name": c["name"], "status": c["status"]}
+                for c in data.get("components", [])
+                if c["name"] in _ATLASSIAN_COMPONENTS
+            ]
+            incidents = [
+                {
+                    "name": inc["name"],
+                    "impact": inc.get("impact", ""),
+                    "shortlink": inc.get("shortlink", ""),
+                }
+                for inc in data.get("incidents", [])
+            ]
+            overall = _worst_status([c["status"] for c in components])
+            services.append(
+                {
+                    "name": "Atlassian",
+                    "status": overall,
+                    "url": STATUS_URLS["atlassian"],
+                    "components": components,
+                    "incidents": incidents,
+                }
+            )
+        except Exception:
+            logger.warning("Service status: Atlassian check failed")
+            services.append(
+                {
+                    "name": "Atlassian",
+                    "status": "unknown",
+                    "url": STATUS_URLS["atlassian"],
+                    "components": [],
+                    "incidents": [],
+                }
+            )
+
+        # --- GitLab (authenticated connectivity check, verify=False for self-signed certs) ---
+        if settings.gitlab_url:
+            try:
+                gl_headers = {}
+                if settings.gitlab_pat:
+                    gl_headers["PRIVATE-TOKEN"] = settings.gitlab_pat
+                async with httpx.AsyncClient(timeout=15, verify=False, follow_redirects=True) as gl_client:
+                    resp = await gl_client.get(
+                        f"{settings.gitlab_url}/api/v4/version",
+                        headers=gl_headers,
+                    )
+                gl_status = "operational" if resp.status_code < 500 else "major_outage"
+            except Exception as exc:
+                logger.warning("Service status: GitLab check failed: %s", exc)
+                gl_status = "unreachable"
+            services.append(
+                {
+                    "name": "GitLab",
+                    "status": gl_status,
+                    "url": STATUS_URLS["gitlab"],
+                    "components": [],
+                    "incidents": [],
+                }
+            )
+
+    _service_status = {"services": services, "polled_at": now}
+    degraded = [s for s in services if s["status"] not in ("operational", "unknown")]
+    if degraded:
+        logger.warning(
+            "Service status: %s",
+            ", ".join(f"{s['name']}={s['status']}" for s in degraded),
+        )
+    else:
+        logger.info("Service status: all operational")
+
+
+# ---------------------------------------------------------------------------
+# Main poll orchestrator
+# ---------------------------------------------------------------------------
+
+
 async def poll_all() -> None:
     cycle_start = datetime.now(timezone.utc).isoformat()
     logger.info("Starting poll cycle at %s", cycle_start)
@@ -1149,6 +1295,10 @@ async def poll_all() -> None:
         await poll_google_calendar()
     except Exception:
         logger.exception("Google Calendar poll failed")
+    try:
+        await poll_service_status()
+    except Exception:
+        logger.exception("Service status poll failed")
 
     stale_prs = await cleanup_stale_prs(cycle_start)
     stale_jira = await cleanup_stale_jira_issues(cycle_start)

@@ -3,20 +3,27 @@
 Pure logic -- operates on a ScanResult dict from scanner.py with no I/O.
 Returns a ScoreResult with per-category breakdowns, findings, and a letter grade.
 
-Scoring rubric (150 raw points, normalized to 100):
-  Agent Configuration  30 pts
+Research-backed scoring rubric (170 raw points, normalized to 100):
+  Agent Configuration  35 pts  (AGENTS.md quality, line limits, section completeness)
   Documentation        25 pts
-  CI/CD & Quality      25 pts
+  CI/CD & Quality      30 pts  (type checkers, pre-commit hooks)
   Code Structure       20 pts
-  Security & Safety    20 pts
-  Fullsend Readiness   30 pts  (skills, backpressure, context quality)
+  Security & Safety    25 pts  (agent config risk scanning)
+  Fullsend Readiness   35 pts  (skill quality, symlinks, deeper backpressure)
+
+References:
+  - arXiv 2601.20404: AGENTS.md reduces agent runtime by 28.6%
+  - agents.md standard: 6 core sections, <100 lines recommended
+  - Anthropic CLAUDE.md docs: <200 lines for >90% adherence
+  - agentskills.io spec: YAML frontmatter, "Use when..." descriptions
+  - AgentLint: security scanning for agent config files
 """
 
 from __future__ import annotations
 
 import re
 
-RAW_MAX = 150
+RAW_MAX = 170
 
 
 def score_repo(scan: dict) -> dict:
@@ -50,7 +57,7 @@ def _finding(present: bool, label: str, pts: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Agent Configuration (30 pts)
+# Agent Configuration (35 pts)
 # ---------------------------------------------------------------------------
 
 
@@ -58,15 +65,42 @@ def _score_agent_config(scan: dict) -> dict:
     score = 0
     findings = []
 
+    agents_analysis = scan.get("agents_md_analysis", {})
     agents_md = scan["key_files"].get("AGENTS.md", "")
-    if agents_md and len(agents_md) > 500:
-        findings.append(_finding(True, "AGENTS.md present and substantive", 10))
-        score += 10
-    elif agents_md:
-        findings.append(_finding(True, "AGENTS.md present but minimal", 5))
-        score += 5
+    if agents_analysis.get("present"):
+        lines = agents_analysis.get("lines", 0)
+        section_count = agents_analysis.get("section_count", 0)
+        quality = agents_analysis.get("quality", "unknown")
+
+        if quality == "verbose":
+            findings.append(_finding(True, f"AGENTS.md present but verbose ({lines} lines, <100 recommended)", 5))
+            score += 5
+        elif section_count >= 4 and lines <= 100:
+            findings.append(
+                _finding(
+                    True,
+                    f"AGENTS.md well-structured ({lines} lines, {section_count} sections)",
+                    12,
+                )
+            )
+            score += 12
+        elif section_count >= 2:
+            findings.append(
+                _finding(
+                    True,
+                    f"AGENTS.md has {section_count} sections (4+ recommended per standard)",
+                    8,
+                )
+            )
+            score += 8
+        elif len(agents_md) > 500:
+            findings.append(_finding(True, "AGENTS.md present and substantive", 7))
+            score += 7
+        else:
+            findings.append(_finding(True, "AGENTS.md present but minimal", 4))
+            score += 4
     else:
-        findings.append(_finding(False, "AGENTS.md missing", 0))
+        findings.append(_finding(False, "AGENTS.md missing (reduces agent runtime 28.6% per arXiv 2601.20404)", 0))
 
     claude_md = scan["key_files"].get("CLAUDE.md", "")
     if claude_md:
@@ -116,7 +150,12 @@ def _score_agent_config(scan: dict) -> dict:
     else:
         findings.append(_finding(False, ".codex/config.toml missing", 0))
 
-    return {"score": min(score, 30), "max": 30, "findings": findings}
+    claude_rules = scan.get("claude_rules", [])
+    if claude_rules:
+        findings.append(_finding(True, f".claude/rules/ directory ({len(claude_rules)} rules)", 3))
+        score += 3
+
+    return {"score": min(score, 35), "max": 35, "findings": findings}
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +221,7 @@ def _score_documentation(scan: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# CI/CD & Quality (25 pts)
+# CI/CD & Quality (30 pts)
 # ---------------------------------------------------------------------------
 
 
@@ -220,7 +259,22 @@ def _score_ci_quality(scan: dict) -> dict:
         else:
             findings.append(_finding(False, "No test files found", 0))
 
-    return {"score": min(score, 25), "max": 25, "findings": findings}
+    type_checkers = scan.get("type_checker_files", [])
+    if type_checkers:
+        names = [p.split("/")[-1] for p in type_checkers[:3]]
+        findings.append(_finding(True, f"Type checker configured ({', '.join(names)})", 5))
+        score += 5
+    else:
+        findings.append(_finding(False, "No type checker (tsconfig, mypy, pyright)", 0))
+
+    pre_commit = scan.get("pre_commit_files", [])
+    if pre_commit:
+        findings.append(_finding(True, "Pre-commit hooks configured", 5))
+        score += 5
+    else:
+        findings.append(_finding(False, "No pre-commit hooks (.pre-commit-config.yaml, .husky)", 0))
+
+    return {"score": min(score, 30), "max": 30, "findings": findings}
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +338,7 @@ def _score_code_structure(scan: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Security & Safety (20 pts) -- NEW
+# Security & Safety (25 pts) -- agent config risk scanning
 # ---------------------------------------------------------------------------
 
 
@@ -331,11 +385,19 @@ def _score_security(scan: dict) -> dict:
     else:
         findings.append(_finding(False, "SECURITY.md missing", 0))
 
-    return {"score": min(score, 20), "max": 20, "findings": findings}
+    agent_risks = scan.get("agent_config_risks", [])
+    if not agent_risks:
+        findings.append(_finding(True, "No risky patterns in agent config files (AgentLint check)", 5))
+        score += 5
+    else:
+        risk_summary = f"{len(agent_risks)} risky pattern(s): {agent_risks[0]['pattern'][:40]}"
+        findings.append(_finding(False, f"Agent config security risks found — {risk_summary}", 0))
+
+    return {"score": min(score, 25), "max": 25, "findings": findings}
 
 
 # ---------------------------------------------------------------------------
-# Fullsend Readiness (30 pts) -- skills, backpressure, context quality
+# Fullsend Readiness (35 pts) -- skills, backpressure, context quality
 # ---------------------------------------------------------------------------
 
 
@@ -343,9 +405,10 @@ def _score_fullsend_readiness(scan: dict) -> dict:
     """Score readiness for fullsend agentic SDLC platform.
 
     Based on fullsend-ai/fullsend repo-readiness and codebase-context docs:
-    - Agent skills (agentskills.io spec)
-    - Backpressure mechanisms (linters, type checkers, tests in CI)
+    - Agent skills (agentskills.io spec) with quality assessment
+    - Backpressure mechanisms (linters, type checkers, pre-commit, tests in CI)
     - Context file quality (CLAUDE.md brevity, BOOKMARKS.md)
+    - Skill symlinks for agent discovery
     - CODEOWNERS for human approval paths
     """
     score = 0
@@ -367,23 +430,46 @@ def _score_fullsend_readiness(scan: dict) -> dict:
     else:
         findings.append(_finding(False, "No skills/ directory with SKILL.md files", 0))
 
+    skill_symlinks = scan.get("skill_symlinks", [])
+    if skill_symlinks:
+        findings.append(
+            _finding(True, f"Skills symlinked for agent discovery ({len(skill_symlinks)} in .claude/.cursor)", 3)
+        )
+        score += 3
+    elif existing_skills:
+        findings.append(_finding(False, "Skills exist but not symlinked to .claude/ or .cursor/ for discovery", 0))
+
     ci_commands = scan.get("ci_commands", {})
     bp_count = 0
+    bp_details = []
     if ci_commands.get("test"):
         bp_count += 1
+        bp_details.append("CI tests")
     if ci_commands.get("lint"):
         bp_count += 1
+        bp_details.append("CI lint")
     if scan.get("linter_files"):
         bp_count += 1
+        bp_details.append("linter configs")
     if scan.get("test_dirs"):
         bp_count += 1
+        bp_details.append("test dirs")
+    if scan.get("type_checker_files"):
+        bp_count += 1
+        bp_details.append("type checker")
+    if scan.get("pre_commit_files"):
+        bp_count += 1
+        bp_details.append("pre-commit hooks")
 
-    if bp_count >= 3:
-        findings.append(_finding(True, f"Strong backpressure ({bp_count} mechanisms: tests, linters, CI)", 8))
+    if bp_count >= 4:
+        findings.append(_finding(True, f"Strong backpressure ({bp_count}: {', '.join(bp_details[:4])})", 8))
         score += 8
+    elif bp_count >= 2:
+        findings.append(_finding(True, f"Moderate backpressure ({bp_count}: {', '.join(bp_details)})", 5))
+        score += 5
     elif bp_count >= 1:
-        findings.append(_finding(True, f"Partial backpressure ({bp_count} mechanism{'s' if bp_count != 1 else ''})", 4))
-        score += 4
+        findings.append(_finding(True, f"Minimal backpressure ({bp_details[0]})", 2))
+        score += 2
     else:
         findings.append(_finding(False, "No backpressure mechanisms (tests/linters in CI)", 0))
 
@@ -392,15 +478,24 @@ def _score_fullsend_readiness(scan: dict) -> dict:
     if claude_md and claude_md_lines <= 60:
         findings.append(_finding(True, f"CLAUDE.md is concise ({claude_md_lines} lines, ≤60 recommended)", 5))
         score += 5
-    elif claude_md and claude_md_lines > 60:
-        findings.append(_finding(True, f"CLAUDE.md is verbose ({claude_md_lines} lines, ≤60 recommended)", 2))
-        score += 2
+    elif claude_md and claude_md_lines <= 200:
+        findings.append(
+            _finding(True, f"CLAUDE.md is moderate ({claude_md_lines} lines, ≤60 ideal, <200 for >90% adherence)", 3)
+        )
+        score += 3
+    elif claude_md:
+        findings.append(
+            _finding(
+                True, f"CLAUDE.md is verbose ({claude_md_lines} lines, >200 hurts adherence per Anthropic docs)", 1
+            )
+        )
+        score += 1
     else:
         findings.append(_finding(False, "No CLAUDE.md for agent context", 0))
 
     if scan.get("has_bookmarks"):
-        findings.append(_finding(True, "BOOKMARKS.md for progressive disclosure", 4))
-        score += 4
+        findings.append(_finding(True, "BOOKMARKS.md for progressive disclosure", 3))
+        score += 3
     else:
         findings.append(_finding(False, "No BOOKMARKS.md for on-demand references", 0))
 
@@ -411,7 +506,15 @@ def _score_fullsend_readiness(scan: dict) -> dict:
     else:
         findings.append(_finding(False, "No CODEOWNERS for merge approval paths", 0))
 
-    return {"score": min(score, 30), "max": 30, "findings": findings}
+    arch_quality = scan.get("arch_md_quality", {})
+    if arch_quality.get("quality") in ("good", "excellent"):
+        findings.append(_finding(True, f"ARCHITECTURE.md quality: {arch_quality['quality']}", 3))
+        score += 3
+    elif arch_quality.get("present"):
+        findings.append(_finding(True, "ARCHITECTURE.md present but could be improved", 1))
+        score += 1
+
+    return {"score": min(score, 35), "max": 35, "findings": findings}
 
 
 # ---------------------------------------------------------------------------
@@ -439,13 +542,32 @@ def _letter_grade(normalized: int) -> str:
 def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
     recs = []
 
-    agent = categories["agent_config"]
+    agents_analysis = scan.get("agents_md_analysis", {})
     if not scan["key_files"].get("AGENTS.md"):
         recs.append(
             {
                 "priority": "high",
-                "text": "Add an AGENTS.md file to guide AI agents through your codebase",
-                "impact": "+8 pts",
+                "text": "Add AGENTS.md — reduces agent iteration time by 28.6% (arXiv 2601.20404). Include: summary, rules, build/test, style, architecture, security sections",
+                "impact": "+12 pts",
+            }
+        )
+    elif agents_analysis.get("quality") == "verbose":
+        recs.append(
+            {
+                "priority": "medium",
+                "text": f"Trim AGENTS.md to <100 lines (currently {agents_analysis.get('lines', 0)}) — concise files reduce prompt token waste",
+                "impact": "+4 pts",
+            }
+        )
+    elif agents_analysis.get("section_count", 0) < 4:
+        missing = set(["summary", "rules", "build", "test", "style", "architecture"]) - set(
+            agents_analysis.get("sections_found", [])
+        )
+        recs.append(
+            {
+                "priority": "medium",
+                "text": f"Add missing AGENTS.md sections: {', '.join(sorted(missing)[:4])}",
+                "impact": "+4 pts",
             }
         )
 
@@ -453,7 +575,7 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
         recs.append(
             {
                 "priority": "medium",
-                "text": "Add CLAUDE.md with imperative commands for Claude Code",
+                "text": "Add CLAUDE.md with imperative commands for Claude Code (<200 lines for >90% adherence per Anthropic docs)",
                 "impact": "+3 pts",
             }
         )
@@ -463,7 +585,7 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
             {
                 "priority": "medium",
                 "text": "Add .cursor/rules/ directory with project-specific rules",
-                "impact": "+4 pts",
+                "impact": "+5 pts",
             }
         )
 
@@ -476,59 +598,84 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
             }
         )
 
-    docs = categories["documentation"]
     if not scan["key_files"].get("ARCHITECTURE.md"):
         recs.append(
             {
                 "priority": "high",
-                "text": "Add ARCHITECTURE.md describing system structure and key design decisions",
-                "impact": "+6 pts",
+                "text": "Add ARCHITECTURE.md with headings, code blocks, and API docs — agents use this as primary nav reference",
+                "impact": "+7 pts",
             }
         )
+    else:
+        arch_quality = scan.get("arch_md_quality", {})
+        if arch_quality.get("quality") in ("minimal", "unstructured"):
+            recs.append(
+                {
+                    "priority": "medium",
+                    "text": f"Improve ARCHITECTURE.md — currently {arch_quality.get('quality')}. Add headings, code blocks, and component descriptions",
+                    "impact": "+2 pts",
+                }
+            )
+
     if not scan["key_files"].get("CONTRIBUTING.md"):
         recs.append(
             {
                 "priority": "medium",
                 "text": "Add CONTRIBUTING.md with build, test, and submission instructions",
-                "impact": "+4 pts",
+                "impact": "+5 pts",
             }
         )
 
-    ci = categories["ci_quality"]
     if not scan.get("has_ci"):
         recs.append(
             {
                 "priority": "high",
                 "text": "Set up GitHub Actions for CI/CD (lint, test, build)",
-                "impact": "+7 pts",
+                "impact": "+8 pts",
             }
         )
     if not scan["key_files"].get("CODEOWNERS"):
         recs.append(
             {
-                "priority": "low",
-                "text": "Add a CODEOWNERS file for automatic review assignment",
-                "impact": "+4 pts",
+                "priority": "medium",
+                "text": "Add CODEOWNERS for automatic review assignment and human approval paths",
+                "impact": "+5 pts",
             }
         )
 
-    structure = categories["code_structure"]
+    if not scan.get("type_checker_files"):
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Add type checking (tsconfig.json, mypy.ini, pyrightconfig.json) — agents produce fewer type errors with type checkers as backpressure",
+                "impact": "+5 pts",
+            }
+        )
+
+    if not scan.get("pre_commit_files"):
+        recs.append(
+            {
+                "priority": "low",
+                "text": "Add pre-commit hooks (.pre-commit-config.yaml or .husky) — catches agent mistakes before CI",
+                "impact": "+5 pts",
+            }
+        )
+
     if not scan.get("dep_files"):
         recs.append(
             {
                 "priority": "medium",
                 "text": "Add explicit dependency management (go.mod, package.json, etc.)",
-                "impact": "+3 pts",
+                "impact": "+4 pts",
             }
         )
 
-    security = categories["security"]
     if scan.get("secrets_in_tree"):
         recs.append(
             {
                 "priority": "critical",
                 "text": "Remove committed secret files (.env, credentials) from the repository",
-                "impact": "+4 pts",
+                "impact": "+5 pts",
             }
         )
     if not scan.get("gitignore_covers_secrets"):
@@ -544,7 +691,7 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
             {
                 "priority": "medium",
                 "text": "Configure Dependabot or Renovate for automated dependency updates",
-                "impact": "+3 pts",
+                "impact": "+4 pts",
             }
         )
     if not scan["key_files"].get("SECURITY.md"):
@@ -556,15 +703,33 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
             }
         )
 
-    fullsend = categories["fullsend_readiness"]
+    agent_risks = scan.get("agent_config_risks", [])
+    if agent_risks:
+        recs.append(
+            {
+                "priority": "critical",
+                "text": f"Fix {len(agent_risks)} risky pattern(s) in agent config files (e.g., curl|sh, exposed tokens, rm -rf)",
+                "impact": "+5 pts",
+            }
+        )
+
     if not scan.get("existing_skills"):
         recs.append(
             {
                 "priority": "high",
                 "text": "Add agent skills in skills/ directory (agentskills.io spec) — running-tests, debugging-guide, definition-of-done are high-value starting points",
-                "impact": "+6 pts",
+                "impact": "+8 pts",
             }
         )
+    elif not scan.get("skill_symlinks") and scan.get("existing_skills"):
+        recs.append(
+            {
+                "priority": "medium",
+                "text": "Symlink skills/ into .claude/ or .cursor/ for automatic agent discovery",
+                "impact": "+3 pts",
+            }
+        )
+
     if not scan.get("has_bookmarks"):
         recs.append(
             {
@@ -574,12 +739,20 @@ def _build_recommendations(categories: dict, scan: dict) -> list[dict]:
             }
         )
     claude_md_lines = scan.get("claude_md_lines", 0)
-    if claude_md_lines > 60:
+    if claude_md_lines > 200:
         recs.append(
             {
-                "priority": "medium",
-                "text": f"Trim CLAUDE.md to ≤60 lines (currently {claude_md_lines}) — verbose context hurts agent performance (ETH Zürich research)",
-                "impact": "+3 pts",
+                "priority": "high",
+                "text": f"Trim CLAUDE.md to <200 lines (currently {claude_md_lines}) — Anthropic data shows >90% adherence drops above 200 lines",
+                "impact": "+4 pts",
+            }
+        )
+    elif claude_md_lines > 60:
+        recs.append(
+            {
+                "priority": "low",
+                "text": f"Consider trimming CLAUDE.md to ≤60 lines (currently {claude_md_lines}) for optimal conciseness",
+                "impact": "+2 pts",
             }
         )
 

@@ -66,6 +66,16 @@ async def get_available_providers() -> list[dict]:
             }
         )
 
+    if settings.ai_openai_api_key:
+        providers.append(
+            {
+                "id": "openai",
+                "name": "OpenAI",
+                "model": settings.ai_openai_model,
+                "local": False,
+            }
+        )
+
     if settings.ai_gemini_api_key:
         providers.append(
             {
@@ -511,6 +521,38 @@ def _extract_json(text: str) -> dict:
         raise
 
 
+async def call_openai(system: str, user: str) -> tuple[dict, dict]:
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.ai_openai_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": settings.ai_openai_model,
+                "max_tokens": 4096,
+                "temperature": 0.2,
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            },
+        )
+        if resp.status_code == 429:
+            raise RuntimeError("OpenAI rate limit exceeded — wait a minute and try again")
+        if resp.status_code != 200:
+            raise RuntimeError(f"OpenAI API error ({resp.status_code})")
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {})
+        token_usage = {
+            "input_tokens": usage.get("prompt_tokens", 0),
+            "output_tokens": usage.get("completion_tokens", 0),
+        }
+        return _extract_json(content), token_usage
+
+
 async def call_claude(system: str, user: str) -> tuple[dict, dict]:
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(
@@ -527,7 +569,10 @@ async def call_claude(system: str, user: str) -> tuple[dict, dict]:
                 "messages": [{"role": "user", "content": user}],
             },
         )
-        resp.raise_for_status()
+        if resp.status_code == 429:
+            raise RuntimeError("Claude rate limit exceeded — wait a minute and try again")
+        if resp.status_code != 200:
+            raise RuntimeError(f"Claude API error ({resp.status_code})")
         data = resp.json()
         content = data["content"][0]["text"]
         usage = data.get("usage", {})
@@ -553,7 +598,10 @@ async def call_gemini(system: str, user: str) -> tuple[dict, dict]:
                 "generationConfig": {"temperature": 0.2, "maxOutputTokens": 4096},
             },
         )
-        resp.raise_for_status()
+        if resp.status_code == 429:
+            raise RuntimeError("Gemini rate limit exceeded — wait a minute and try again")
+        if resp.status_code != 200:
+            raise RuntimeError(f"Gemini API error ({resp.status_code})")
         data = resp.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
         usage_meta = data.get("usageMetadata", {})
@@ -588,6 +636,7 @@ async def call_ollama(system: str, user: str) -> tuple[dict, dict]:
 
 
 _PROVIDER_MAP = {
+    "openai": call_openai,
     "claude": call_claude,
     "gemini": call_gemini,
     "ollama": call_ollama,
@@ -639,7 +688,9 @@ async def review_pr(pr_id: str, provider: str) -> dict:
             if not output_tokens:
                 output_tokens = 500
             model = ""
-            if provider == "claude":
+            if provider == "openai":
+                model = settings.ai_openai_model
+            elif provider == "claude":
                 model = settings.ai_claude_model
             elif provider == "gemini":
                 model = settings.ai_gemini_model

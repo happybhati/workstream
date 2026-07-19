@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     ai_ollama_model: str = os.getenv("AI_OLLAMA_MODEL", "llama3")
     ai_claude_api_key: str = os.getenv("AI_CLAUDE_API_KEY", "")
     ai_claude_model: str = os.getenv("AI_CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    ai_openai_api_key: str = os.getenv("AI_OPENAI_API_KEY", "")
+    ai_openai_model: str = os.getenv("AI_OPENAI_MODEL", "gpt-4o")
     ai_gemini_api_key: str = os.getenv("AI_GEMINI_API_KEY", "")
     ai_gemini_model: str = os.getenv("AI_GEMINI_MODEL", "gemini-2.0-flash")
 

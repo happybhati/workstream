@@ -1379,6 +1379,200 @@ def generate_files(scan: dict, score_result: dict | None = None, intelligence: d
 
 
 # ---------------------------------------------------------------------------
+# AI-enhanced generation (optional -- uses configured AI providers)
+# ---------------------------------------------------------------------------
+
+
+def _get_ai_provider_info() -> tuple[str, str] | None:
+    """Return (provider_name, model_name) for the best available provider, or None."""
+    from config import settings as _s
+
+    if _s.ai_gemini_api_key:
+        return ("gemini", _s.ai_gemini_model)
+    if _s.ai_openai_api_key:
+        return ("openai", _s.ai_openai_model)
+    if _s.ai_claude_api_key:
+        return ("claude", _s.ai_claude_model)
+    return None
+
+
+async def _call_ai_provider(system_prompt: str, user_prompt: str) -> str | None:
+    """Try the best available AI provider. Returns None on failure."""
+    try:
+        from config import settings as _s
+
+        if _s.ai_gemini_api_key:
+            return await _call_gemini_gen(system_prompt, user_prompt, _s)
+        if _s.ai_openai_api_key:
+            return await _call_openai_gen(system_prompt, user_prompt, _s)
+        if _s.ai_claude_api_key:
+            return await _call_claude_gen(system_prompt, user_prompt, _s)
+    except Exception as exc:
+        logger.warning("AI generation failed, using template: %s", exc)
+    return None
+
+
+async def _call_gemini_gen(system: str, user: str, cfg) -> str:
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{cfg.ai_gemini_model}:generateContent?key={cfg.ai_gemini_api_key}"
+    )
+    payload = {
+        "contents": [{"parts": [{"text": f"{system}\n\n{user}"}]}],
+        "generationConfig": {"maxOutputTokens": 2000, "temperature": 0.3},
+    }
+    async with httpx.AsyncClient(timeout=30) as c:
+        resp = await c.post(url, json=payload)
+        if resp.status_code != 200:
+            return ""
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+
+async def _call_openai_gen(system: str, user: str, cfg) -> str:
+    async with httpx.AsyncClient(timeout=30) as c:
+        resp = await c.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {cfg.ai_openai_api_key}"},
+            json={
+                "model": cfg.ai_openai_model,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+                "max_tokens": 2000,
+                "temperature": 0.3,
+            },
+        )
+        if resp.status_code != 200:
+            return ""
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+async def _call_claude_gen(system: str, user: str, cfg) -> str:
+    async with httpx.AsyncClient(timeout=30) as c:
+        resp = await c.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": cfg.ai_claude_api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": cfg.ai_claude_model,
+                "max_tokens": 2000,
+                "system": system,
+                "messages": [{"role": "user", "content": user}],
+            },
+        )
+        if resp.status_code != 200:
+            return ""
+        return resp.json()["content"][0]["text"]
+
+
+async def ai_enhance_agents_md(scan: dict, template: str) -> str:
+    """Use AI to improve a template AGENTS.md with repo-specific insights."""
+    system = dedent("""\
+        You write AGENTS.md files for GitHub repos to guide AI coding agents.
+        Keep under 80 lines. Include: summary, rules, build, test, style, architecture, security.
+        Be imperative and specific. Output ONLY markdown.""")
+    user = dedent(f"""\
+        Repo: {scan["owner"]}/{scan["repo"]} | Lang: {scan.get("primary_language", "?")}
+        Desc: {scan.get("description", "")}
+        Dirs: {", ".join(scan.get("dirs", [])[:15])}
+        CI: {scan.get("ci_commands", {})} | Make: {scan.get("makefile_targets", [])}
+        Linters: {[p.split("/")[-1] for p in scan.get("linter_files", [])]}
+        Template to improve:\n---\n{template[:3000]}\n---
+        Make it specific, remove generic advice, add concrete commands. Keep under 80 lines.""")
+    result = await _call_ai_provider(system, user)
+    return result.strip() if result and len(result.strip()) > 100 else template
+
+
+async def ai_enhance_architecture_md(scan: dict, template: str) -> str:
+    """Use AI to improve a template ARCHITECTURE.md."""
+    system = dedent("""\
+        You write ARCHITECTURE.md for repos. Include: overview, directory purpose,
+        key components, data flow, API surface. Use headings and code blocks. Output ONLY markdown.""")
+    readme = scan.get("key_files", {}).get("README.md", "")[:1500]
+    user = dedent(f"""\
+        Repo: {scan["owner"]}/{scan["repo"]} | Lang: {scan.get("primary_language", "?")}
+        Desc: {scan.get("description", "")}
+        Dirs: {", ".join(scan.get("dirs", [])[:20])}
+        README excerpt: {readme[:1200]}
+        Template:\n---\n{template[:3000]}\n---
+        Make specific and add component relationships.""")
+    result = await _call_ai_provider(system, user)
+    return result.strip() if result and len(result.strip()) > 100 else template
+
+
+async def ai_enhance_skill(scan: dict, skill_name: str, template: str) -> str:
+    """Use AI to improve a template skill SKILL.md."""
+    system = dedent("""\
+        You write agentskills.io SKILL.md files. Must have YAML frontmatter with name,
+        description (start "Use when..."), version, author. Then actionable markdown.
+        Output ONLY SKILL.md content.""")
+    user = dedent(f"""\
+        Repo: {scan["owner"]}/{scan["repo"]} | Lang: {scan.get("primary_language", "?")}
+        Skill: {skill_name} | CI: {scan.get("ci_commands", {})}
+        Make: {scan.get("makefile_targets", [])}
+        Template:\n---\n{template[:2000]}\n---
+        Make specific with exact commands.""")
+    result = await _call_ai_provider(system, user)
+    return result.strip() if result and len(result.strip()) > 50 else template
+
+
+async def generate_files_ai_enhanced(
+    scan: dict,
+    score_result: dict | None = None,
+    intelligence: dict | None = None,
+    use_ai: bool = True,
+) -> dict:
+    """Generate files with optional AI enhancement.
+
+    Returns {"files": {...}, "ai_provider": str|None, "ai_model": str|None,
+             "ai_enhanced_files": [...], "method": "ai"|"template"}.
+    """
+    files = generate_files(scan, score_result, intelligence)
+
+    provider_info = _get_ai_provider_info() if use_ai else None
+    if not use_ai or not provider_info:
+        return {
+            "files": files,
+            "ai_provider": None,
+            "ai_model": None,
+            "ai_enhanced_files": [],
+            "method": "template",
+        }
+
+    provider_name, model_name = provider_info
+    enhanced = []
+
+    if "AGENTS.md" in files:
+        result = await ai_enhance_agents_md(scan, files["AGENTS.md"])
+        if result != files["AGENTS.md"]:
+            files["AGENTS.md"] = result
+            enhanced.append("AGENTS.md")
+
+    if "ARCHITECTURE.md" in files:
+        result = await ai_enhance_architecture_md(scan, files["ARCHITECTURE.md"])
+        if result != files["ARCHITECTURE.md"]:
+            files["ARCHITECTURE.md"] = result
+            enhanced.append("ARCHITECTURE.md")
+
+    skill_keys = [k for k in files if k.startswith("skills/") and k.endswith("SKILL.md")]
+    for sk in skill_keys[:3]:
+        sn = sk.split("/")[1] if len(sk.split("/")) >= 3 else sk
+        result = await ai_enhance_skill(scan, sn, files[sk])
+        if result != files[sk]:
+            files[sk] = result
+            enhanced.append(sk)
+
+    return {
+        "files": files,
+        "ai_provider": provider_name,
+        "ai_model": model_name,
+        "ai_enhanced_files": enhanced,
+        "method": "ai" if enhanced else "template_fallback",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Draft PR creation via GitHub API
 # ---------------------------------------------------------------------------
 

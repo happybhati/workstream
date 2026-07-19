@@ -28,7 +28,8 @@ from database import (
     get_yearly_completions,
     init_db,
 )
-from pollers import poll_all
+from pollers import get_service_status, poll_all
+from rebaser import get_pr_branch_info, rebase_pr
 from reviewer import (
     build_copy_prompt,
     fetch_pr_diff,
@@ -116,7 +117,7 @@ async def auth_middleware(request: Request, call_next):
     if not token:
         return await call_next(request)
 
-    if request.url.path in ("/api/health",):
+    if request.url.path in ("/api/health", "/api/service-status"):
         return await call_next(request)
 
     auth_header = request.headers.get("authorization", "")
@@ -244,6 +245,11 @@ async def api_refresh():
     return JSONResponse({"status": "ok"})
 
 
+@app.get("/api/service-status")
+async def api_service_status():
+    return JSONResponse(get_service_status())
+
+
 @app.get("/api/stats")
 async def api_stats():
     all_my_prs = await get_my_prs(settings.github_username, settings.gitlab_username, include_closed=True)
@@ -319,6 +325,45 @@ async def api_review_post(request: Request):
         return JSONResponse(result)
     except Exception as exc:
         logger.exception("Failed to post review for %s", pr_id)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ---------------------------------------------------------------------------
+# PR Rebase endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/pr/branch-info")
+async def api_pr_branch_info(pr_id: str):
+    """Fetch branch info for a PR (head, base, default branch)."""
+    try:
+        info = await get_pr_branch_info(pr_id)
+        return JSONResponse(info)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.exception("Failed to get branch info for %s", pr_id)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/pr/rebase")
+async def api_pr_rebase(request: Request):
+    """Rebase a PR branch onto target branch."""
+    body = await request.json()
+    pr_id = body.get("pr_id", "")
+    target_branch = body.get("target_branch") or None
+    if not pr_id:
+        return JSONResponse({"error": "pr_id is required"}, status_code=400)
+    try:
+        result = await rebase_pr(pr_id, target_branch)
+        status_code = 200 if result.get("status") == "ok" else 422
+        if result.get("status") == "error":
+            status_code = 500
+        return JSONResponse(result, status_code=status_code)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except Exception as exc:
+        logger.exception("Rebase failed for %s", pr_id)
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
@@ -556,6 +601,104 @@ async def api_readiness_agentready(request: Request):
     finally:
         if tmpdir:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@app.post("/api/readiness/generate-ai")
+async def api_readiness_generate_ai(request: Request):
+    """Generate AI-enhanced readiness files using configured LLM provider."""
+    from agentic_readiness.generator import generate_files_ai_enhanced
+    from agentic_readiness.scanner import scan_repo
+    from agentic_readiness.scorer import score_repo
+
+    body = await request.json()
+    repo_url = body.get("repo_url", "").strip()
+    use_ai = body.get("use_ai", True)
+    if not repo_url:
+        return JSONResponse({"error": "repo_url is required"}, status_code=400)
+    try:
+        scan_result = await scan_repo(repo_url)
+        score_result = score_repo(scan_result)
+        result = await generate_files_ai_enhanced(scan_result, score_result, use_ai=use_ai)
+        return JSONResponse(
+            {
+                "files": result["files"],
+                "full_name": scan_result["full_name"],
+                "ai_enhanced": bool(result["ai_enhanced_files"]),
+                "ai_provider": result["ai_provider"],
+                "ai_model": result["ai_model"],
+                "ai_enhanced_files": result["ai_enhanced_files"],
+                "method": result["method"],
+            }
+        )
+    except Exception as exc:
+        logger.exception("AI-enhanced generation failed for %s", repo_url)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@app.post("/api/readiness/batch-scan")
+async def api_readiness_batch_scan(request: Request):
+    """Scan multiple repos and return a leaderboard-style summary."""
+    from agentic_readiness.scanner import scan_repo
+    from agentic_readiness.scorer import score_repo
+    from database import insert_readiness_scan
+
+    body = await request.json()
+    repo_urls = body.get("repo_urls", [])
+    if not repo_urls or not isinstance(repo_urls, list):
+        return JSONResponse({"error": "repo_urls list is required"}, status_code=400)
+    if len(repo_urls) > 20:
+        return JSONResponse({"error": "Maximum 20 repos per batch"}, status_code=400)
+
+    results = []
+    for url in repo_urls:
+        url = url.strip()
+        if not url:
+            continue
+        try:
+            scan_result = await scan_repo(url)
+            score_result = score_repo(scan_result)
+            await insert_readiness_scan(
+                {
+                    "repo_url": url,
+                    "owner": scan_result["owner"],
+                    "repo": scan_result["repo"],
+                    "score_total": score_result["total"],
+                    "score_agent_config": score_result["categories"]["agent_config"]["score"],
+                    "score_documentation": score_result["categories"]["documentation"]["score"],
+                    "score_ci_quality": score_result["categories"]["ci_quality"]["score"],
+                    "score_code_structure": score_result["categories"]["code_structure"]["score"],
+                    "score_security": score_result["categories"]["security"]["score"],
+                    "score_fullsend": score_result["categories"].get("fullsend_readiness", {}).get("score", 0),
+                    "grade": score_result["grade"],
+                    "findings": json.dumps(score_result),
+                    "scanned_at": scan_result["scanned_at"],
+                }
+            )
+            results.append(
+                {
+                    "repo_url": url,
+                    "full_name": scan_result["full_name"],
+                    "total": score_result["total"],
+                    "grade": score_result["grade"],
+                    "categories": {
+                        k: {"score": v["score"], "max": v["max"]} for k, v in score_result["categories"].items()
+                    },
+                    "recommendation_count": len(score_result.get("recommendations", [])),
+                    "status": "ok",
+                }
+            )
+        except Exception as exc:
+            logger.warning("Batch scan failed for %s: %s", url, exc)
+            results.append({"repo_url": url, "status": "error", "error": str(exc)})
+
+    results.sort(key=lambda r: r.get("total", 0), reverse=True)
+    return JSONResponse(
+        {
+            "results": results,
+            "scanned": sum(1 for r in results if r["status"] == "ok"),
+            "failed": sum(1 for r in results if r["status"] == "error"),
+        }
+    )
 
 
 @app.get("/api/intelligence/stats")
