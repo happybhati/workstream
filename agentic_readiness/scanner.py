@@ -118,6 +118,41 @@ SECRET_CONTENT_RE = re.compile(
     r"|password\s*[:=]\s*['\"][^'\"]{8,})"
 )
 
+RISKY_AGENT_PATTERNS = re.compile(
+    r"(?i)(curl\s.*\|\s*(ba)?sh"
+    r"|wget\s.*\|\s*(ba)?sh"
+    r"|\$\{?(?:GITHUB_TOKEN|AWS_SECRET|OPENAI_API_KEY|ANTHROPIC_API_KEY|GH_TOKEN)\}?"
+    r"|rm\s+-rf\s+/"
+    r"|eval\s*\("
+    r"|exec\s*\()"
+)
+
+AGENTS_MD_SECTIONS = [
+    "summary",
+    "rules",
+    "guidelines",
+    "context",
+    "must-read",
+    "build",
+    "test",
+    "style",
+    "architecture",
+    "security",
+]
+
+TYPE_CHECKER_PATTERNS = {
+    "mypy.ini",
+    ".mypy.ini",
+    "pyrightconfig.json",
+    "tsconfig.json",
+    "jsconfig.json",
+}
+
+PRE_COMMIT_FILES = {
+    ".pre-commit-config.yaml",
+    ".husky",
+}
+
 
 def _github_headers() -> dict:
     return {
@@ -250,6 +285,16 @@ async def scan_repo(repo_url: str) -> dict:
 
     existing_skills = sorted(p for p in all_paths if p.startswith("skills/") and p.endswith("SKILL.md"))
 
+    skill_symlinks = sorted(
+        p
+        for p in all_paths
+        if (p.startswith(".claude/skills/") or p.startswith(".cursor/skills/") or p.startswith(".agents/skills/"))
+        and p.endswith("SKILL.md")
+    )
+
+    type_checker_files = [p for p in all_paths if p.split("/")[-1] in TYPE_CHECKER_PATTERNS]
+    pre_commit_files = [p for p in all_paths if p.split("/")[-1] in PRE_COMMIT_FILES or p.startswith(".husky/")]
+
     ci_content = {}
     async with httpx.AsyncClient(
         base_url=GITHUB_API,
@@ -270,6 +315,11 @@ async def scan_repo(repo_url: str) -> dict:
 
     claude_md_lines = len(key_files.get("CLAUDE.md", "").splitlines()) if key_files.get("CLAUDE.md") else 0
     has_bookmarks = bool(key_files.get("BOOKMARKS.md", ""))
+
+    agents_md_analysis = _analyze_agents_md(key_files.get("AGENTS.md", ""))
+    skill_details = _analyze_skills(existing_skills, key_files, ci_content, client if False else None)
+    agent_config_risks = _detect_agent_config_risks(key_files)
+    arch_md_quality = _analyze_architecture_md(key_files.get("ARCHITECTURE.md", ""))
 
     return {
         "owner": owner,
@@ -303,12 +353,128 @@ async def scan_repo(repo_url: str) -> dict:
         "dockerfiles": dockerfiles,
         "deployment_manifests": deployment_manifests,
         "existing_skills": existing_skills,
+        "skill_symlinks": skill_symlinks,
+        "skill_details": skill_details,
+        "type_checker_files": type_checker_files,
+        "pre_commit_files": pre_commit_files,
         "ci_content": ci_content,
         "ci_commands": ci_commands,
         "makefile_targets": makefile_targets,
         "claude_md_lines": claude_md_lines,
         "has_bookmarks": has_bookmarks,
+        "agents_md_analysis": agents_md_analysis,
+        "agent_config_risks": agent_config_risks,
+        "arch_md_quality": arch_md_quality,
         "scanned_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _analyze_agents_md(content: str) -> dict:
+    """Analyze AGENTS.md for section completeness, line count, and quality."""
+    if not content:
+        return {"present": False, "lines": 0, "sections_found": [], "section_count": 0, "quality": "missing"}
+
+    lines = content.splitlines()
+    line_count = len(lines)
+    lower = content.lower()
+
+    sections_found = []
+    for section in AGENTS_MD_SECTIONS:
+        if section in lower or f"# {section}" in lower or f"## {section}" in lower:
+            sections_found.append(section)
+
+    heading_re = re.compile(r"^#{1,3}\s+(.+)", re.MULTILINE)
+    headings = heading_re.findall(content)
+
+    quality = "good"
+    if line_count > 100:
+        quality = "verbose"
+    elif line_count < 10:
+        quality = "minimal"
+    elif len(sections_found) < 3:
+        quality = "incomplete"
+
+    return {
+        "present": True,
+        "lines": line_count,
+        "sections_found": sections_found,
+        "section_count": len(sections_found),
+        "headings": headings[:10],
+        "quality": quality,
+        "under_60": line_count <= 60,
+        "under_100": line_count <= 100,
+    }
+
+
+def _analyze_skills(skill_paths: list[str], key_files: dict, ci_content: dict, client) -> list[dict]:
+    """Analyze skill quality from paths (content fetched separately if needed)."""
+    details = []
+    for path in skill_paths:
+        parts = path.split("/")
+        if len(parts) < 3:
+            continue
+        skill_name = parts[1]
+        detail = {
+            "path": path,
+            "name": skill_name,
+            "has_frontmatter": False,
+            "has_description": False,
+            "description_optimized": False,
+            "has_scripts_dir": False,
+            "has_references_dir": False,
+            "quality_score": 0,
+        }
+        details.append(detail)
+    return details
+
+
+def _detect_agent_config_risks(key_files: dict) -> list[dict]:
+    """Scan agent config files for risky patterns (AgentLint-inspired)."""
+    risks = []
+    files_to_check = ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md"]
+    for fname in files_to_check:
+        content = key_files.get(fname, "")
+        if not content:
+            continue
+        for match in RISKY_AGENT_PATTERNS.finditer(content):
+            risks.append(
+                {
+                    "file": fname,
+                    "pattern": match.group(0)[:80],
+                    "severity": "high" if "rm -rf" in match.group(0).lower() else "medium",
+                }
+            )
+    return risks
+
+
+def _analyze_architecture_md(content: str) -> dict:
+    """Assess ARCHITECTURE.md quality for AI readability."""
+    if not content:
+        return {"present": False, "quality": "missing", "has_headings": False, "has_code_blocks": False}
+
+    headings = re.findall(r"^#{1,3}\s+.+", content, re.MULTILINE)
+    code_blocks = content.count("```")
+    has_api = bool(re.search(r"(?i)(api|endpoint|route|grpc|rest|graphql)", content))
+    has_diagram = bool(re.search(r"(?i)(mermaid|diagram|flowchart|graph\s|sequenceDiagram)", content))
+    lines = len(content.splitlines())
+
+    quality = "good"
+    if lines < 20:
+        quality = "minimal"
+    elif not headings:
+        quality = "unstructured"
+    elif len(headings) >= 3 and code_blocks >= 2:
+        quality = "excellent"
+
+    return {
+        "present": True,
+        "quality": quality,
+        "lines": lines,
+        "has_headings": bool(headings),
+        "heading_count": len(headings),
+        "has_code_blocks": code_blocks > 0,
+        "has_api_docs": has_api,
+        "has_diagrams": has_diagram,
     }
 
 

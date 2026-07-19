@@ -6,6 +6,7 @@
 .env
 google_credentials.json
 google_token.json
+google_token_docs.json
 
 # --- Databases (contain personal data) ---
 *.db

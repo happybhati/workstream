@@ -50,6 +50,7 @@ OAuth 2.0 setup:
 
 You can use one or more providers. **Copy Prompt** mode works without API keys: it only builds a prompt you paste into any LLM.
 
+- **OpenAI** — Create an API key in the [OpenAI Platform](https://platform.openai.com/api-keys). Set `AI_OPENAI_API_KEY`. Optionally set `AI_OPENAI_MODEL` (default: `gpt-4o`).
 - **Claude** — Create an API key in the [Anthropic Console](https://console.anthropic.com/). Set `AI_CLAUDE_API_KEY`. Optionally set `AI_CLAUDE_MODEL` (see defaults in the reference table below).
 - **Gemini** — Create an API key in [Google AI Studio](https://aistudio.google.com/). Set `AI_GEMINI_API_KEY`. Optionally set `AI_GEMINI_MODEL`.
 - **Ollama** — Install [Ollama](https://ollama.com/) locally and pull a model. Set `AI_OLLAMA_URL` if not using the default local endpoint, and `AI_OLLAMA_MODEL` to the model tag you use.
@@ -80,6 +81,8 @@ You can use one or more providers. **Copy Prompt** mode works without API keys: 
 | `AI_GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model id for reviews. |
 | `AI_OLLAMA_MODEL` | No | `llama3` | Ollama model name/tag. |
 | `AI_OLLAMA_URL` | No | `http://localhost:11434` | Ollama HTTP API base URL. |
+| `AI_OPENAI_API_KEY` | No | *(empty)* | OpenAI API key for GPT-based review. |
+| `AI_OPENAI_MODEL` | No | `gpt-4o` | OpenAI model id for reviews. |
 | `DB_PATH` | No | `<project>/data.db` | SQLite database file path. |
 | `DISPLAY_NAME` | No | *(empty)* | Name shown in the UI greeting. |
 | `GITHUB_PAT` | Yes* | *(empty)* | GitHub personal access token (fine-grained or classic per your policy). |

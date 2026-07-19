@@ -96,15 +96,26 @@ def _perfect_scan() -> dict:
             "cursor_rules": ["repo.mdc"],
             "doc_dirs": ["docs"],
             "key_files": {
-                "AGENTS.md": "x" * 600,
+                "AGENTS.md": "# Summary\nOverview\n# Rules\nDo X\n# Build\nmake build\n# Test\nmake test\n# Style\nPEP8\n# Context\nPython repo\n",
                 "CLAUDE.md": "claude instructions",
                 "GEMINI.md": "gemini instructions",
                 "README.md": "A" * 1100 + "\npip install -r requirements.txt\npytest\n",
                 ".github/copilot-instructions.md": "copilot instructions content",
                 ".codex/config.toml": "[codex]\nsetup = 'make setup'",
-                "ARCHITECTURE.md": "architecture overview " * 50,
+                "ARCHITECTURE.md": "# Architecture\n" + "architecture overview " * 50,
                 "CONTRIBUTING.md": "how to contribute " * 50,
             },
+            "agents_md_analysis": {
+                "lines": 12,
+                "sections_found": ["summary", "rules", "build", "test", "style", "context"],
+                "section_count": 6,
+            },
+            "type_checker_files": ["mypy.ini"],
+            "pre_commit_files": [".pre-commit-config.yaml"],
+            "agent_config_risks": [],
+            "skill_symlinks": [".claude/skills/test-skill"],
+            "arch_md_quality": {"lines": 50, "has_heading": True, "sections": 3},
+            "existing_skills": ["skills/test-skill/SKILL.md"],
         }
     )
     return scan
